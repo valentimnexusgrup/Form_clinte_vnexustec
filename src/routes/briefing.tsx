@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState, useCallback, useRef } from "react";
 import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
-import logoSrc from "@/assets/vnexus-logo.svg";
+import logoSrc from "@/assets/vnexus-logo.webp";
 import { steps, type Field } from "@/lib/briefing-schema";
 import { useIdentification } from "@/lib/identification";
 import { supabase } from "@/lib/supabase";
@@ -279,7 +279,8 @@ function BriefingPage() {
           <img
             src={logoSrc}
             alt="VNEXUS TEC"
-            className="mx-auto h-20 w-auto drop-shadow-[0_0_30px_rgba(15,76,255,0.35)]"
+            className="mx-auto w-44 h-auto object-contain drop-shadow-[0_0_30px_rgba(15,76,255,0.35)]"
+            draggable={false}
           />
           <div className="mt-8 inline-flex items-center gap-2 rounded-full border border-accent/40 bg-accent/10 px-4 py-1.5 text-xs font-semibold uppercase tracking-widest text-accent">
             ✓ Briefing concluído
@@ -321,7 +322,8 @@ function BriefingPage() {
           <img
             src={logoSrc}
             alt="VNEXUS TEC"
-            className="h-20 w-auto drop-shadow-[0_0_30px_rgba(15,76,255,0.35)]"
+            className="w-44 h-auto object-contain drop-shadow-[0_0_30px_rgba(15,76,255,0.35)]"
+            draggable={false}
           />
           <p className="mt-4 text-xs font-semibold uppercase tracking-[0.3em] text-gradient-gold">
             Briefing · Landing Page
@@ -441,7 +443,8 @@ function ThankYou({ onNew }: { onNew: () => void }) {
         <img
           src={logoSrc}
           alt="VNEXUS TEC"
-          className="mx-auto h-20 w-auto drop-shadow-[0_0_30px_rgba(15,76,255,0.35)]"
+          className="mx-auto w-44 h-auto object-contain drop-shadow-[0_0_30px_rgba(15,76,255,0.35)]"
+          draggable={false}
         />
         <div className="mt-8 inline-flex items-center gap-2 rounded-full border border-accent/40 bg-accent/10 px-4 py-1.5 text-xs font-semibold uppercase tracking-widest text-accent">
           ✓ Briefing recebido

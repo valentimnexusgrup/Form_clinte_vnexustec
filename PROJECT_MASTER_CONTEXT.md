@@ -154,7 +154,7 @@ Form Cliente VN Tec/
 
 | Diretório | Finalidade |
 |---|---|
-| `src/assets/` | Assets estáticos compilados pelo Vite (apenas logo SVG) |
+| `src/assets/` | Assets estáticos compilados pelo Vite (logo em WebP + SVG legado) |
 | `src/components/ui/` | Componentes de UI reutilizáveis (shadcn/ui) — headless, acessíveis, estilizados com Tailwind |
 | `src/hooks/` | Custom hooks compartilhados |
 | `src/lib/` | Lógica de negócio pura — sem JSX, sem efeitos colaterais de UI |
@@ -680,6 +680,10 @@ Para adicionar: editar a constante e rebuildar.
 | 23/06/2026 | Correção visual do campo de busca no painel admin | Fundo escuro semi-transparente (`bg-white/5`), texto branco, placeholder visível, foco com ring azul quântico |
 | 23/06/2026 | Busca admin alterada de `profile_id` para `profiles.full_name` | Join Supabase `briefings -> profiles(full_name)`, tipagem atualizada, busca por nome do cliente |
 | 23/06/2026 | Nome do cliente exibido como identificador principal na listagem | UUID movido para texto secundário abaixo do nome; avatar usa inicial do nome |
+| 23/06/2026 | Correção de acessibilidade nos inputs de formulário (admin.tsx e index.tsx) | Chrome bloqueava acesso ao /admin devido a warnings "form field should have an id or name attribute" e "No label associated with a form field". Adicionados `id`, `name` e `htmlFor` nos 4 inputs de login admin e landing page. |
+| 23/06/2026 | Substituição da logo SVG por WebP | Todos os imports de `vnexus-logo.svg` trocados para `vnexus-logo.webp` em 4 arquivos. O SVG permanece em disco mas não é mais importado. |
+| 23/06/2026 | Correção de segurança: placeholders do login admin não expõem mais credenciais | `placeholder="Admin VNEXUS"` → `"Digite seu nome"` e `placeholder="{0203}"` → `"Digite seu identificador"` em `admin.tsx`. Credenciais reais não são mais visíveis na interface. |
+| 23/06/2026 | Redimensionamento da logo em todas as páginas | Logo aumentada de tamanhos variados (`h-10`, `h-16`, `h-20`, `h-24`) para largura padronizada `w-44` (~176px) com `h-auto object-contain` e `draggable={false}` em todas as 7 ocorrências nos 4 arquivos. |
 
 ---
 
@@ -718,6 +722,7 @@ Para adicionar: editar a constante e rebuildar.
 - ~~Navegação para `/admin` não funcionava — link congelava sem resposta.~~ (Corrigido em 23/06/2026 — causa: cache desatualizado do Vite/router. Solução: limpeza de cache + regeneração da route tree.)
 - ~~Campo de busca no admin com fundo branco e texto branco — conteúdo invisível.~~ (Corrigido em 23/06/2026 — aplicado estilo dark `bg-white/5 text-white placeholder:text-white/40`.)
 - ~~Busca no admin baseada em `profile_id` (UUID) — inviável para uso administrativo.~~ (Corrigido em 23/06/2026 — substituído por busca em `profiles.full_name` com join Supabase.)
+- ~~Chrome bloqueando acesso ao /admin devido a warnings de acessibilidade (inputs sem `id`/`name`/`htmlFor`).~~ (Corrigido em 23/06/2026 — adicionados `id`, `name` e `htmlFor` nos 4 inputs de formulário em admin.tsx e index.tsx.)
 
 ### 12.2 Limitações
 
@@ -790,6 +795,10 @@ Para adicionar: editar a constante e rebuildar.
 - **Busca admin por nome do cliente**: Consulta Supabase alterada de `select("*")` para `select("*, profiles(full_name)")`. Filtro agora usa `b.profiles?.full_name?.toLowerCase()`. Placeholder alterado para "Buscar por nome do cliente…".
 - **Tipagem `BriefingRow` atualizada**: Adicionado campo opcional `profiles?: { full_name: string }` para refletir o join com a tabela `profiles`.
 - **Nome do cliente como identificador principal**: Na listagem, avatar mostra inicial do nome, texto principal exibe `profiles.full_name`, e UUID `profile_id` é exibido como texto secundário menor.
+- **Correção de acessibilidade nos inputs**: Adicionados atributos `id`, `name` e `htmlFor` nos 4 inputs de formulário (admin login: Nome + Identificador; landing page: Nome Completo + WhatsApp) para resolver warnings do Chrome que bloqueavam o acesso ao /admin.
+- **Logo SVG → WebP**: Todos os 4 imports de `vnexus-logo.svg` substituídos por `vnexus-logo.webp` (`index.tsx`, `admin.tsx`, `briefing.tsx`, `briefing-summary.tsx`). O SVG permanece em disco. Nenhuma classe ou dimensão alterada.
+- **Segurança: placeholders do login admin sanitizados**: `placeholder="Admin VNEXUS"` removido (substituído por `"Digite seu nome"`) e `placeholder="{0203}"` removido (substituído por `"Digite seu identificador"`) em `admin.tsx` — as credenciais reais não ficam mais expostas visualmente na interface de login.
+- **Redimensionamento da logo**: Todas as 7 ocorrências da logo nos 4 arquivos (`index.tsx`, `admin.tsx`, `briefing.tsx`, `briefing-summary.tsx`) tiveram suas classes Tailwind alteradas de altura fixa (`h-10`, `h-16`, `h-20`, `h-24`) para largura padronizada `w-44 h-auto object-contain` com `draggable={false}`.
 
 ### Instruções para Próximas Intervenções
 

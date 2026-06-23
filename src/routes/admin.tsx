@@ -1,5 +1,5 @@
 import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
-import logoSrc from "@/assets/vnexus-logo.svg";
+import logoSrc from "@/assets/vnexus-logo.webp";
 import { useIdentification } from "@/lib/identification";
 import { useEffect, useState } from "react";
 import { supabase } from "@/lib/supabase";
@@ -170,7 +170,8 @@ function AdminPage() {
           <img
             src={logoSrc}
             alt="VNEXUS TEC"
-            className="h-16 w-auto drop-shadow-[0_0_20px_rgba(15,76,255,0.35)]"
+            className="w-44 h-auto object-contain drop-shadow-[0_0_20px_rgba(15,76,255,0.35)]"
+            draggable={false}
           />
           <h1 className="mt-6 text-2xl font-bold">Área Administrativa</h1>
           <p className="mt-2 text-sm text-muted-foreground">
@@ -179,27 +180,31 @@ function AdminPage() {
 
           <form onSubmit={handleAdminLogin} className="mt-8 w-full space-y-4">
             <div className="text-left">
-              <label className="mb-1.5 block text-xs font-semibold uppercase tracking-wider text-muted-foreground">
+              <label htmlFor="admin-name" className="mb-1.5 block text-xs font-semibold uppercase tracking-wider text-muted-foreground">
                 Nome
               </label>
               <input
+                id="admin-name"
+                name="admin-name"
                 type="text"
                 value={adminName}
                 onChange={(e) => setAdminName(e.target.value)}
-                placeholder="Admin VNEXUS"
+                placeholder="Digite seu nome"
                 className="w-full rounded-lg border border-border bg-input/40 px-4 py-3 text-sm text-foreground placeholder:text-muted-foreground/60 transition focus:border-primary focus:bg-input/70 focus:outline-none focus:ring-2 focus:ring-primary/30"
                 disabled={adminSubmitting}
               />
             </div>
             <div className="text-left">
-              <label className="mb-1.5 block text-xs font-semibold uppercase tracking-wider text-muted-foreground">
+              <label htmlFor="admin-identifier" className="mb-1.5 block text-xs font-semibold uppercase tracking-wider text-muted-foreground">
                 Identificador
               </label>
               <input
+                id="admin-identifier"
+                name="admin-identifier"
                 type="text"
                 value={adminPhone}
                 onChange={(e) => setAdminPhone(e.target.value)}
-                placeholder="{0203}"
+                placeholder="Digite seu identificador"
                 className="w-full rounded-lg border border-border bg-input/40 px-4 py-3 text-sm text-foreground placeholder:text-muted-foreground/60 transition focus:border-primary focus:bg-input/70 focus:outline-none focus:ring-2 focus:ring-primary/30"
                 disabled={adminSubmitting}
               />
@@ -249,7 +254,8 @@ function AdminPage() {
             <img
               src={logoSrc}
               alt="VNEXUS TEC"
-              className="h-10 w-auto drop-shadow-[0_0_20px_rgba(15,76,255,0.35)]"
+              className="w-44 h-auto object-contain drop-shadow-[0_0_20px_rgba(15,76,255,0.35)]"
+              draggable={false}
             />
             <div>
               <h1 className="text-2xl font-bold">Administração</h1>

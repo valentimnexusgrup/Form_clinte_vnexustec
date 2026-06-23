@@ -1,6 +1,6 @@
 import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
 import { useState } from "react";
-import logoSrc from "@/assets/vnexus-logo.svg";
+import logoSrc from "@/assets/vnexus-logo.webp";
 import { useIdentification } from "@/lib/identification";
 import { supabase } from "@/lib/supabase";
 
@@ -108,11 +108,12 @@ function LandingPage() {
   return (
     <div className="min-h-screen px-4 py-10 sm:py-16">
       <div className="mx-auto flex max-w-lg flex-col items-center text-center">
-        <img
-          src={logoSrc}
-          alt="VNEXUS TEC"
-          className="h-24 w-auto drop-shadow-[0_0_30px_rgba(15,76,255,0.35)]"
-        />
+          <img
+            src={logoSrc}
+            alt="VNEXUS TEC"
+            className="w-44 h-auto object-contain drop-shadow-[0_0_30px_rgba(15,76,255,0.35)]"
+            draggable={false}
+          />
         <p className="mt-6 text-xs font-semibold uppercase tracking-[0.3em] text-gradient-gold">
           Briefing · Landing Page
         </p>
@@ -125,10 +126,12 @@ function LandingPage() {
 
         <form onSubmit={handleSubmit} className="mt-10 w-full space-y-5">
           <div className="text-left">
-            <label className="mb-1.5 block text-xs font-semibold uppercase tracking-wider text-muted-foreground">
+            <label htmlFor="full-name" className="mb-1.5 block text-xs font-semibold uppercase tracking-wider text-muted-foreground">
               Nome Completo
             </label>
             <input
+              id="full-name"
+              name="fullName"
               type="text"
               value={fullName}
               onChange={(e) => setFullName(e.target.value)}
@@ -139,10 +142,12 @@ function LandingPage() {
           </div>
 
           <div className="text-left">
-            <label className="mb-1.5 block text-xs font-semibold uppercase tracking-wider text-muted-foreground">
+            <label htmlFor="phone-last4" className="mb-1.5 block text-xs font-semibold uppercase tracking-wider text-muted-foreground">
               Últimos 4 dígitos do WhatsApp
             </label>
             <input
+              id="phone-last4"
+              name="phoneLast4"
               type="text"
               inputMode="numeric"
               maxLength={4}
