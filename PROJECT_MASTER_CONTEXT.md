@@ -197,7 +197,7 @@ Form Cliente VN Tec/
 6. Se encontrado: recupera perfil existente
 7. Se não encontrado: cria novo perfil automaticamente
 8. Redireciona para `/briefing`
-9. Footer com link discreto "Área Administrativa" → `/admin`
+9. Footer com link discreto "Área Administrativa" → `/admin` (usa `<Link to="/admin">` do TanStack Router)
 
 **Arquivos envolvidos**: `src/routes/index.tsx`, `src/lib/identification.tsx`
 
@@ -236,13 +236,15 @@ Form Cliente VN Tec/
 2. Se não identificado: exibe formulário de login administrativo
 3. Preenche Nome + Identificador; validação é feita direto contra `ADMIN_USERS` **sem consultar Supabase**
 4. Se autorizado: cria profile manual via `setProfile()` e exibe dashboard
-5. Filtros: busca textual por ID do perfil, filtro por status
+5. Filtros: busca textual por nome do cliente (via `profiles.full_name` com join Supabase), filtro por status
 6. Ao clicar em um briefing: exibe detalhes completos (todas as etapas)
 7. Ações: alterar status inline via select, excluir briefing com confirmação
 
 **Status disponíveis**: Novo, Em análise, Em produção, Aguardando aprovação, Aprovado, Arquivado
 
 **Arquivos envolvidos**: `src/routes/admin.tsx`, `src/lib/identification.tsx`, `src/lib/supabase.ts`, `src/lib/briefing-schema.ts`
+
+> Nota: A busca por perfil foi alterada de `profile_id` para `profiles.full_name`. A consulta Supabase agora inclui `select("*, profiles(full_name)")` e a tipagem `BriefingRow` possui o campo opcional `profiles?: { full_name: string }`.
 
 ### 4.4 Autosave
 
@@ -319,7 +321,7 @@ Form Cliente VN Tec/
 3. Validação direta contra ADMIN_USERS (sem Supabase)
 4. Se autorizado: setProfile() manual + redireciona para dashboard
 5. Se não autorizado: mensagem de acesso negado
-6. Filtra briefings por status ou busca por ID do perfil
+6. Filtra briefings por status ou busca por nome do cliente
 7. Clica em briefing para ver detalhes completos
 8. Altera status inline via select (atualiza Supabase)
 9. Exclui briefing se necessário (com confirmação)
@@ -673,6 +675,11 @@ Para adicionar: editar a constante e rebuildar.
 | 23/06/2026 | `identification.tsx`: exposto `setProfile` no context | Admin precisava definir profile manualmente sem Supabase |
 | 23/06/2026 | `supabase.ts`: `import createClient` movido para o topo | Import no final do arquivo podia causar erros em build |
 | 23/06/2026 | RLS desabilitado na tabela `profiles` via migration `disable_rls_profiles` | RLS estava ativado sem policies — bloqueava INSERT do role `anon` mesmo com `GRANT ALL` |
+| 23/06/2026 | Correção: erros de formatação prettier em `index.tsx` e `admin.tsx` | ESLint apontava 9 erros de formatação que foram corrigidos com `prettier --write` |
+| 23/06/2026 | Regeneração forçada da route tree (`routeTree.gen.ts`) | Cache do Vite removido + arquivo deletado e regenerado pelo plugin do TanStack Router para garantir que a rota `/admin` fosse reconhecida |
+| 23/06/2026 | Correção visual do campo de busca no painel admin | Fundo escuro semi-transparente (`bg-white/5`), texto branco, placeholder visível, foco com ring azul quântico |
+| 23/06/2026 | Busca admin alterada de `profile_id` para `profiles.full_name` | Join Supabase `briefings -> profiles(full_name)`, tipagem atualizada, busca por nome do cliente |
+| 23/06/2026 | Nome do cliente exibido como identificador principal na listagem | UUID movido para texto secundário abaixo do nome; avatar usa inicial do nome |
 
 ---
 
@@ -708,14 +715,16 @@ Para adicionar: editar a constante e rebuildar.
 
 ### 12.1 Bugs
 
-- Nenhum bug conhecido no momento. (Última correção: admin login passava pelo Supabase desnecessariamente — corrigido em 23/06/2026.)
+- ~~Navegação para `/admin` não funcionava — link congelava sem resposta.~~ (Corrigido em 23/06/2026 — causa: cache desatualizado do Vite/router. Solução: limpeza de cache + regeneração da route tree.)
+- ~~Campo de busca no admin com fundo branco e texto branco — conteúdo invisível.~~ (Corrigido em 23/06/2026 — aplicado estilo dark `bg-white/5 text-white placeholder:text-white/40`.)
+- ~~Busca no admin baseada em `profile_id` (UUID) — inviável para uso administrativo.~~ (Corrigido em 23/06/2026 — substituído por busca em `profiles.full_name` com join Supabase.)
 
 ### 12.2 Limitações
 
 - **Sem autenticação forte**: Qualquer pessoa que saiba Nome + WhatsApp de outro usuário pode acessar o briefing dele. Isto é uma escolha deliberada de design (simplicidade > segurança para este contexto).
 - **Admin depende de rebuild**: A lista `ADMIN_USERS` é hardcoded — requer rebuild do projeto para adicionar/remover administradores.
 - **Permissões de tabela**: Ao recriar tabelas via migration, as grants para a role `anon` podem ser perdidas — necessário reaplicar `GRANT ALL ON public.profiles TO anon`. (Atualmente OK — verificado em 23/06/2026.)
-- **Busca no admin limitada**: A busca no painel administrativo busca apenas por ID do perfil (não por nome ou telefone do cliente).
+- **Busca no admin limitada**: A busca no painel administrativo busca por nome do cliente via `profiles.full_name` (não por telefone). UUID do perfil é exibido como texto secundário.
 - **Storage público**: O bucket `briefing_files` tem políticas públicas — qualquer pessoa pode listar/excluir arquivos.
 
 ### 12.3 Riscos Técnicos
@@ -752,6 +761,9 @@ Para adicionar: editar a constante e rebuildar.
 - **supabase.ts**: `import createClient` movido para o topo do arquivo
 - **Build**: ✅ TypeScript sem erros, ✅ Build completo, ✅ Sem referências OAuth
 - **Documentação**: Consolidada em `PROJECT_MASTER_CONTEXT.md`
+- **Busca admin**: Baseada em `profiles.full_name` via join Supabase `select("*, profiles(full_name)")` — UUID exibido como texto secundário
+- **Campo de busca admin**: Estilo dark `bg-white/5 text-white placeholder:text-white/40` com `border-white/10`
+- **Tipagem**: `BriefingRow.profiles?.full_name` disponível para acesso ao nome do cliente
 - **Permissões Supabase**: Grants da role `anon` confirmadas OK para `profiles` e `briefings`; RLS desabilitado em ambas as tabelas (migration `disable_rls_profiles`)
 
 ### Últimas Mudanças (23/06/2026)
@@ -773,6 +785,11 @@ Para adicionar: editar a constante e rebuildar.
 - **`index.tsx`**: busca qualquer briefing (sem filtrar `completed`) antes de criar novo — evita duplicidade para usuários com briefing concluído
 - **`supabase.ts`**: `import createClient` movido para o topo do arquivo
 - **RLS**: Desabilitado RLS na tabela `profiles` via migration `disable_rls_profiles` — RLS ativado sem policies bloqueava INSERTs do role `anon`
+- **Correção navegação `/admin`**: Link "Área Administrativa" em `index.tsx` já usava `<Link to="/admin">` (correto). Erros de formatação prettier (9 erros) corrigidos em `index.tsx` e `admin.tsx`. Cache do Vite limpo e `routeTree.gen.ts` regenerado para garantir reconhecimento da rota.
+- **Correção visual campo de busca admin**: Input de busca no painel alterado para `bg-white/5 text-white placeholder:text-white/40` com `border-white/10` e ring focus azul quântico — fundo branco invisível eliminado.
+- **Busca admin por nome do cliente**: Consulta Supabase alterada de `select("*")` para `select("*, profiles(full_name)")`. Filtro agora usa `b.profiles?.full_name?.toLowerCase()`. Placeholder alterado para "Buscar por nome do cliente…".
+- **Tipagem `BriefingRow` atualizada**: Adicionado campo opcional `profiles?: { full_name: string }` para refletir o join com a tabela `profiles`.
+- **Nome do cliente como identificador principal**: Na listagem, avatar mostra inicial do nome, texto principal exibe `profiles.full_name`, e UUID `profile_id` é exibido como texto secundário menor.
 
 ### Instruções para Próximas Intervenções
 
@@ -906,14 +923,17 @@ Se houver problemas com identificação (especialmente no admin):
 ### Admin
 
 | Item | Status |
-|---|---|---|
+|---|---|
 | `ADMIN_USERS` configurado | ✅ (`Admin VNEXUS` / `{0203}`) |
 | Login bypass do Supabase | ✅ Validação direta em ADMIN_USERS |
-| Lista de briefings | ✅ Do Supabase |
+| Lista de briefings | ✅ Do Supabase com join `profiles(full_name)` |
+| Busca por nome do cliente | ✅ `profiles.full_name` |
+| Exibição do nome do cliente | ✅ Nome como principal, UUID como secundário |
 | Filtro por status | ✅ |
 | Mudança de status inline | ✅ |
 | Exclusão | ✅ |
 | Detalhes do briefing | ✅ |
+| Campo de busca com tema dark | ✅ `bg-white/5 text-white placeholder:text-white/40` |
 
 ### Briefing
 

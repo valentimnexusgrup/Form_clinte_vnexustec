@@ -28,6 +28,9 @@ type BriefingRow = {
   status: string | null;
   data: Record<string, unknown>;
   other: Record<string, unknown>;
+  profiles?: {
+    full_name: string;
+  };
 };
 
 const STATUS_OPTIONS = [
@@ -39,12 +42,16 @@ const STATUS_OPTIONS = [
   "Arquivado",
 ];
 
-const ADMIN_USERS = [
-  { full_name: "Admin VNEXUS", phone_last4: "{0203}" },
-];
+const ADMIN_USERS = [{ full_name: "Admin VNEXUS", phone_last4: "{0203}" }];
 
 function AdminPage() {
-  const { profile, loading: authLoading, identify, setProfile, clearIdentification } = useIdentification();
+  const {
+    profile,
+    loading: authLoading,
+    identify,
+    setProfile,
+    clearIdentification,
+  } = useIdentification();
   const navigate = useNavigate();
 
   const [briefings, setBriefings] = useState<BriefingRow[]>([]);
@@ -59,7 +66,9 @@ function AdminPage() {
   const [adminSubmitting, setAdminSubmitting] = useState(false);
 
   const isAdmin = profile
-    ? ADMIN_USERS.some((u) => u.full_name === profile.full_name && u.phone_last4 === profile.phone_last4)
+    ? ADMIN_USERS.some(
+        (u) => u.full_name === profile.full_name && u.phone_last4 === profile.phone_last4,
+      )
     : false;
 
   useEffect(() => {
@@ -75,7 +84,7 @@ function AdminPage() {
 
       const query = supabase
         .from("briefings")
-        .select("*")
+        .select("*, profiles(full_name)")
         .order("created_at", { ascending: false });
 
       const { data } = await query;
@@ -90,9 +99,9 @@ function AdminPage() {
 
   const filtered = briefings.filter((b) => {
     const searchLower = search.toLowerCase();
-    const profileIdMatch = b.profile_id?.toLowerCase().includes(searchLower);
+    const nameMatch = b.profiles?.full_name?.toLowerCase().includes(searchLower);
     const statusMatch = !statusFilter || b.status === statusFilter;
-    return (profileIdMatch || !search) && statusMatch;
+    return (nameMatch || !search) && statusMatch;
   });
 
   const updateStatus = async (id: string, status: string) => {
@@ -125,9 +134,7 @@ function AdminPage() {
 
     console.log("[ADMIN] login iniciado:", name, identifier);
 
-    const matched = ADMIN_USERS.find(
-      (u) => u.full_name === name && u.phone_last4 === identifier,
-    );
+    const matched = ADMIN_USERS.find((u) => u.full_name === name && u.phone_last4 === identifier);
 
     if (!matched) {
       console.warn("[ADMIN] credenciais inválidas:", name, identifier);
@@ -197,9 +204,7 @@ function AdminPage() {
                 disabled={adminSubmitting}
               />
             </div>
-            {adminError && (
-              <p className="text-xs font-medium text-destructive">{adminError}</p>
-            )}
+            {adminError && <p className="text-xs font-medium text-destructive">{adminError}</p>}
             <button
               type="submit"
               disabled={adminSubmitting}
@@ -270,10 +275,10 @@ function AdminPage() {
             <div className="mb-4 flex flex-col gap-3 sm:flex-row">
               <input
                 type="text"
-                placeholder="Buscar por ID do perfil…"
+                placeholder="Buscar por nome do cliente…"
                 value={search}
                 onChange={(e) => setSearch(e.target.value)}
-                className="flex-1 rounded-lg border border-border bg-input/40 px-4 py-2.5 text-sm text-foreground placeholder:text-muted-foreground/60 transition focus:border-primary focus:bg-input/70 focus:outline-none focus:ring-2 focus:ring-primary/30"
+                className="flex-1 rounded-lg border border-white/10 bg-white/5 px-4 py-2.5 text-sm text-white placeholder:text-white/40 transition focus:border-primary focus:outline-none focus:ring-2 focus:ring-[oklch(0.55_0.245_264)]"
               />
               <select
                 value={statusFilter}
@@ -321,12 +326,19 @@ function AdminPage() {
                         <td className="px-4 py-3">
                           <div className="flex items-center gap-2.5">
                             <div className="flex h-8 w-8 shrink-0 items-center justify-center overflow-hidden rounded-full bg-gradient-brand text-[10px] font-bold uppercase text-primary-foreground">
-                              {b.profile_id?.charAt(0).toUpperCase() || "?"}
+                              {b.profiles?.full_name?.charAt(0).toUpperCase() ||
+                                b.profile_id?.charAt(0).toUpperCase() ||
+                                "?"}
                             </div>
                             <div className="min-w-0">
                               <p className="truncate font-medium text-foreground">
-                                {b.profile_id || "—"}
+                                {b.profiles?.full_name || "—"}
                               </p>
+                              {b.profile_id && (
+                                <p className="truncate text-[10px] text-muted-foreground">
+                                  {b.profile_id}
+                                </p>
+                              )}
                             </div>
                           </div>
                         </td>

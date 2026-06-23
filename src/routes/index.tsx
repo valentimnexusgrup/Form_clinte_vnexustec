@@ -69,10 +69,16 @@ function LandingPage() {
       return;
     }
 
-    const latestBriefing = existingBriefings && existingBriefings.length > 0 ? existingBriefings[0] : null;
+    const latestBriefing =
+      existingBriefings && existingBriefings.length > 0 ? existingBriefings[0] : null;
 
     if (latestBriefing) {
-      console.log("[INDEX] briefing encontrado, redirecionando:", latestBriefing.id, "completed:", latestBriefing.completed);
+      console.log(
+        "[INDEX] briefing encontrado, redirecionando:",
+        latestBriefing.id,
+        "completed:",
+        latestBriefing.completed,
+      );
       setSubmitting(false);
       navigate({ to: "/briefing" });
       return;
@@ -148,18 +154,14 @@ function LandingPage() {
             />
           </div>
 
-          {error && (
-            <p className="text-xs font-medium text-destructive">{error}</p>
-          )}
+          {error && <p className="text-xs font-medium text-destructive">{error}</p>}
 
           <button
             type="submit"
             disabled={submitting || loading}
             className="group relative w-full overflow-hidden rounded-lg bg-gradient-brand px-8 py-4 text-sm font-bold uppercase tracking-wider text-primary-foreground shadow-glow transition hover:scale-[1.02] disabled:cursor-not-allowed disabled:opacity-60"
           >
-            <span className="relative z-10">
-              {submitting ? "Aguarde..." : "Continuar"}
-            </span>
+            <span className="relative z-10">{submitting ? "Aguarde..." : "Continuar"}</span>
             <span className="absolute inset-0 -translate-x-full bg-gradient-gold opacity-0 transition group-hover:translate-x-0 group-hover:opacity-30" />
           </button>
         </form>
