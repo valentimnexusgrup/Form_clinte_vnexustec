@@ -660,6 +660,11 @@ Para adicionar: editar a constante e rebuildar.
 | 23/06/2026 | Remoção de RLS e triggers do Supabase Auth | Sistema não requer autenticação forte |
 | 23/06/2026 | Migração de `user_id` para `profile_id` nas briefings | Alinhamento com nova tabela profiles |
 | 23/06/2026 | Consolidação da documentação em `PROJECT_MASTER_CONTEXT.md` | Unificar fonte de verdade |
+| 23/06/2026 | Correção de permissões: `GRANT ALL ON public.profiles TO anon` | CREATE TABLE perde grants da role anon; INSERT retornava 401 |
+| 23/06/2026 | Alteração das credenciais admin para `{0203}` | Solicitação do usuário |
+| 23/06/2026 | Remoção de `inputMode="numeric"` e validação de dígitos no campo identificador | Permitir caracteres especiais como `{` e `}` |
+| 23/06/2026 | Adicionado "Limpar cache" e `clearIdentification()` no login admin | Stale profile no localStorage impedia login |
+| 23/06/2026 | Melhoria no tratamento de erros do `identify()` | Adicionado `console.error` nos blocos catch |
 
 ---
 
@@ -731,9 +736,11 @@ Para adicionar: editar a constante e rebuildar.
 - **Autenticação**: Nenhuma — OAuth removido
 - **Backend**: Supabase Postgres + Storage
 - **Tabelas**: `profiles` (nova estrutura independente) e `briefings`
-- **Admin**: Configurado via constante `ADMIN_USERS` em `src/routes/admin.tsx`
+- **Admin**: Configurado via constante `ADMIN_USERS` em `src/routes/admin.tsx` (`Admin VNEXUS` / `{0203}`)
+- **Identificador admin**: Aceita qualquer caractere (incluindo `{` e `}`)
 - **Build**: ✅ TypeScript sem erros, ✅ Build completo, ✅ Sem referências OAuth
 - **Documentação**: Consolidada em `PROJECT_MASTER_CONTEXT.md`
+- **Permissões Supabase**: Grants da role `anon` reaplicadas manualmente via migration
 
 ### Últimas Mudanças (23/06/2026)
 
@@ -744,6 +751,11 @@ Para adicionar: editar a constante e rebuildar.
 - Criação de `src/lib/identification.tsx`
 - Remoção de `src/lib/auth.tsx` e `src/routes/auth.callback.tsx`
 - Consolidação da documentação
+- Correção de permissões: `GRANT ALL ON public.profiles TO anon` via migration
+- Alteração das credenciais admin para `{0203}`
+- Remoção de restrições de input no campo identificador (aceita `{` e `}`)
+- Adicionado "Limpar cache" e `clearIdentification()` no login admin
+- Melhoria no tratamento de erros do `identify()` com logs no console
 
 ### Instruções para Próximas Intervenções
 
