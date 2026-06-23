@@ -170,7 +170,7 @@ function AdminPage() {
           <img
             src={logoSrc}
             alt="VNEXUS TEC"
-            className="w-44 h-auto object-contain drop-shadow-[0_0_20px_rgba(15,76,255,0.35)]"
+            className="w-80 h-auto object-contain drop-shadow-[0_0_20px_rgba(15,76,255,0.35)]"
             draggable={false}
           />
           <h1 className="mt-6 text-2xl font-bold">Área Administrativa</h1>
@@ -254,7 +254,7 @@ function AdminPage() {
             <img
               src={logoSrc}
               alt="VNEXUS TEC"
-              className="w-44 h-auto object-contain drop-shadow-[0_0_20px_rgba(15,76,255,0.35)]"
+              className="w-56 h-auto object-contain drop-shadow-[0_0_20px_rgba(15,76,255,0.35)]"
               draggable={false}
             />
             <div>

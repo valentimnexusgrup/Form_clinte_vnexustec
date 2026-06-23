@@ -279,7 +279,7 @@ function BriefingPage() {
           <img
             src={logoSrc}
             alt="VNEXUS TEC"
-            className="mx-auto w-44 h-auto object-contain drop-shadow-[0_0_30px_rgba(15,76,255,0.35)]"
+            className="mx-auto w-72 h-auto object-contain drop-shadow-[0_0_30px_rgba(15,76,255,0.35)]"
             draggable={false}
           />
           <div className="mt-8 inline-flex items-center gap-2 rounded-full border border-accent/40 bg-accent/10 px-4 py-1.5 text-xs font-semibold uppercase tracking-widest text-accent">
@@ -322,7 +322,7 @@ function BriefingPage() {
           <img
             src={logoSrc}
             alt="VNEXUS TEC"
-            className="w-44 h-auto object-contain drop-shadow-[0_0_30px_rgba(15,76,255,0.35)]"
+            className="w-72 h-auto object-contain drop-shadow-[0_0_30px_rgba(15,76,255,0.35)]"
             draggable={false}
           />
           <p className="mt-4 text-xs font-semibold uppercase tracking-[0.3em] text-gradient-gold">
@@ -443,7 +443,7 @@ function ThankYou({ onNew }: { onNew: () => void }) {
         <img
           src={logoSrc}
           alt="VNEXUS TEC"
-          className="mx-auto w-44 h-auto object-contain drop-shadow-[0_0_30px_rgba(15,76,255,0.35)]"
+          className="mx-auto w-72 h-auto object-contain drop-shadow-[0_0_30px_rgba(15,76,255,0.35)]"
           draggable={false}
         />
         <div className="mt-8 inline-flex items-center gap-2 rounded-full border border-accent/40 bg-accent/10 px-4 py-1.5 text-xs font-semibold uppercase tracking-widest text-accent">

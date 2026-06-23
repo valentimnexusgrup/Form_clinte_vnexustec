@@ -126,7 +126,7 @@ export function Summary({
     <div className="min-h-screen px-4 py-10 sm:py-16">
       <div className="mx-auto max-w-4xl">
         <header className="mb-10 text-center">
-          <img src={logoSrc} alt="VNEXUS TEC" className="mx-auto w-44 h-auto object-contain" draggable={false} />
+          <img src={logoSrc} alt="VNEXUS TEC" className="mx-auto w-72 h-auto object-contain" draggable={false} />
           <div className="mt-6 inline-flex items-center gap-2 rounded-full border border-accent/40 bg-accent/10 px-4 py-1.5 text-xs font-semibold uppercase tracking-widest text-accent">
             ✓ {title}
           </div>

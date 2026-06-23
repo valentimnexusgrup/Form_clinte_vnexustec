@@ -111,7 +111,7 @@ function LandingPage() {
           <img
             src={logoSrc}
             alt="VNEXUS TEC"
-            className="w-44 h-auto object-contain drop-shadow-[0_0_30px_rgba(15,76,255,0.35)]"
+            className="w-80 h-auto object-contain drop-shadow-[0_0_30px_rgba(15,76,255,0.35)]"
             draggable={false}
           />
         <p className="mt-6 text-xs font-semibold uppercase tracking-[0.3em] text-gradient-gold">
