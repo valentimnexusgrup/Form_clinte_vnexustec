@@ -13,6 +13,7 @@ type IdentificationState = {
   profile: Profile | null;
   loading: boolean;
   identify: (fullName: string, phoneLast4: string) => Promise<Profile | null>;
+  setProfile: (p: Profile) => void;
   clearIdentification: () => void;
 };
 
@@ -21,7 +22,7 @@ const PROFILE_STORAGE_KEY = "vnexus.profile.v1";
 const IdentificationContext = createContext<IdentificationState | null>(null);
 
 export function IdentificationProvider({ children }: { children: ReactNode }) {
-  const [profile, setProfile] = useState<Profile | null>(null);
+  const [profile, setProfileState] = useState<Profile | null>(null);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
@@ -33,7 +34,7 @@ export function IdentificationProvider({ children }: { children: ReactNode }) {
     if (stored) {
       try {
         const parsed = JSON.parse(stored) as Profile;
-        setProfile(parsed);
+        setProfileState(parsed);
       } catch {
         localStorage.removeItem(PROFILE_STORAGE_KEY);
       }
@@ -41,11 +42,24 @@ export function IdentificationProvider({ children }: { children: ReactNode }) {
     setLoading(false);
   }, []);
 
+  const setProfile = (p: Profile) => {
+    console.log("[IDENTIFY] profile definido manualmente:", p.id);
+    setProfileState(p);
+    if (typeof window !== "undefined") {
+      localStorage.setItem(PROFILE_STORAGE_KEY, JSON.stringify(p));
+    }
+  };
+
   const identify = async (fullName: string, phoneLast4: string): Promise<Profile | null> => {
     const trimmedName = fullName.trim();
     const trimmedPhone = phoneLast4.trim();
 
-    if (!trimmedName || !trimmedPhone) return null;
+    if (!trimmedName || !trimmedPhone) {
+      console.warn("[IDENTIFY] nome ou telefone vazio");
+      return null;
+    }
+
+    console.log("[IDENTIFY] buscando profile:", trimmedName, trimmedPhone);
 
     const { data: existingList, error: lookupError } = await supabase
       .from("profiles")
@@ -54,17 +68,21 @@ export function IdentificationProvider({ children }: { children: ReactNode }) {
       .eq("phone_last4", trimmedPhone);
 
     if (lookupError) {
-      console.error("[identify] Erro na busca:", lookupError);
+      console.error("[IDENTIFY] erro na busca:", lookupError.message);
+      return null;
     }
 
     if (existingList && existingList.length > 0) {
-      const existing = existingList[0];
-      setProfile(existing as Profile);
+      const existing = existingList[0] as Profile;
+      console.log("[IDENTIFY] perfil encontrado:", existing.id);
+      setProfileState(existing);
       if (typeof window !== "undefined") {
         localStorage.setItem(PROFILE_STORAGE_KEY, JSON.stringify(existing));
       }
-      return existing as Profile;
+      return existing;
     }
+
+    console.log("[IDENTIFY] perfil não encontrado, criando...");
 
     const { data: newProfile, error: insertError } = await supabase
       .from("profiles")
@@ -73,24 +91,26 @@ export function IdentificationProvider({ children }: { children: ReactNode }) {
       .single();
 
     if (insertError) {
-      console.error("[identify] Erro ao criar perfil:", insertError);
+      console.error("[IDENTIFY] erro ao criar perfil:", insertError.message);
       return null;
     }
 
     if (newProfile) {
       const p = newProfile as Profile;
-      setProfile(p);
+      console.log("[IDENTIFY] perfil criado:", p.id);
+      setProfileState(p);
       if (typeof window !== "undefined") {
         localStorage.setItem(PROFILE_STORAGE_KEY, JSON.stringify(p));
       }
       return p;
     }
 
+    console.warn("[IDENTIFY] perfil não foi criado (resposta vazia)");
     return null;
   };
 
   const clearIdentification = () => {
-    setProfile(null);
+    setProfileState(null);
     if (typeof window !== "undefined") {
       localStorage.removeItem(PROFILE_STORAGE_KEY);
     }
@@ -98,7 +118,7 @@ export function IdentificationProvider({ children }: { children: ReactNode }) {
 
   return (
     <IdentificationContext.Provider
-      value={{ profile, loading, identify, clearIdentification }}
+      value={{ profile, loading, identify, setProfile, clearIdentification }}
     >
       {children}
     </IdentificationContext.Provider>

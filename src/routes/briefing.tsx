@@ -35,43 +35,64 @@ function BriefingPage() {
   const [submitted, setSubmitted] = useState(false);
   const [briefingId, setBriefingId] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
+  const [alreadyCompleted, setAlreadyCompleted] = useState(false);
 
   const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
-  // Redirect if not identified
   useEffect(() => {
     if (!authLoading && !profile) {
       navigate({ to: "/" });
     }
   }, [authLoading, profile, navigate]);
 
-  // Load existing briefing on mount
   useEffect(() => {
     if (!profile) return;
 
     const loadBriefing = async () => {
-      const { data: existing } = await supabase
+      console.log("[BRIEFING] carregando para profile:", profile.id);
+
+      const { data: list, error } = await supabase
         .from("briefings")
         .select("*")
         .eq("profile_id", profile.id)
-        .eq("completed", false)
         .order("created_at", { ascending: false })
-        .limit(1)
-        .single();
+        .limit(1);
 
-      if (existing) {
+      if (error) {
+        console.error("[BRIEFING] erro ao carregar:", error.message);
+        setHydrated(true);
+        return;
+      }
+
+      if (!list || list.length === 0) {
+        console.log("[BRIEFING] nenhum briefing encontrado");
+        setHydrated(true);
+        return;
+      }
+
+      const existing = list[0];
+
+      if (existing.completed) {
+        console.log("[BRIEFING] briefing já concluído:", existing.id);
+        setAlreadyCompleted(true);
         setBriefingId(existing.id);
-        setStepIndex(existing.current_step);
         setData((existing.data as FormState) || {});
         setOther((existing.other as Record<string, string>) || {});
+        setHydrated(true);
+        return;
       }
+
+      console.log("[BRIEFING] briefing incompleto restaurado:", existing.id);
+      setBriefingId(existing.id);
+      setStepIndex(existing.current_step);
+      setData((existing.data as FormState) || {});
+      setOther((existing.other as Record<string, string>) || {});
       setHydrated(true);
     };
 
     loadBriefing();
   }, [profile]);
 
-  // Auto-save with debounce
   const saveToSupabase = useCallback(
     async (step: number, formData: FormState, formOther: Record<string, string>) => {
       if (!profile || submitted) return;
@@ -105,7 +126,7 @@ function BriefingPage() {
           }
         }
       } catch (err) {
-        console.error("Auto-save error:", err);
+        console.error("[BRIEFING] auto-save error:", err);
       } finally {
         setSaving(false);
       }
@@ -114,7 +135,7 @@ function BriefingPage() {
   );
 
   useEffect(() => {
-    if (!hydrated || submitted) return;
+    if (!hydrated || submitted || alreadyCompleted) return;
 
     if (debounceRef.current) clearTimeout(debounceRef.current);
     debounceRef.current = setTimeout(() => {
@@ -124,7 +145,7 @@ function BriefingPage() {
     return () => {
       if (debounceRef.current) clearTimeout(debounceRef.current);
     };
-  }, [stepIndex, data, other, hydrated, submitted, saveToSupabase]);
+  }, [stepIndex, data, other, hydrated, submitted, alreadyCompleted, saveToSupabase]);
 
   const totalSteps = steps.length;
   const current = steps[stepIndex];
@@ -149,7 +170,6 @@ function BriefingPage() {
       setStepIndex((i) => i + 1);
       window.scrollTo({ top: 0, behavior: "smooth" });
     } else {
-      // Save final submission
       if (profile) {
         try {
           if (briefingId) {
@@ -182,7 +202,7 @@ function BriefingPage() {
             }
           }
         } catch (err) {
-          console.error("Submission error:", err);
+          console.error("[BRIEFING] submission error:", err);
         }
       }
       setSubmitted(true);
@@ -215,12 +235,77 @@ function BriefingPage() {
     setStepIndex(0);
     setSubmitted(false);
     setBriefingId(null);
+    setAlreadyCompleted(false);
+  };
+
+  const handleNewBriefing = async () => {
+    if (!profile) return;
+    console.log("[BRIEFING] criando novo briefing para profile:", profile.id);
+    const { data: newBriefing, error } = await supabase
+      .from("briefings")
+      .insert({
+        profile_id: profile.id,
+        current_step: 0,
+        data: {},
+        other: {},
+      })
+      .select()
+      .single();
+
+    if (error) {
+      console.error("[BRIEFING] erro ao criar novo briefing:", error.message);
+      return;
+    }
+
+    if (newBriefing) {
+      console.log("[BRIEFING] novo briefing criado:", newBriefing.id);
+      startNew();
+      navigate({ to: "/briefing" });
+    }
   };
 
   if (authLoading || !hydrated) {
     return (
       <div className="flex min-h-screen items-center justify-center">
         <div className="h-8 w-8 animate-spin rounded-full border-2 border-primary border-t-transparent" />
+      </div>
+    );
+  }
+
+  if (alreadyCompleted) {
+    return (
+      <div className="min-h-screen px-4 py-20">
+        <div className="mx-auto max-w-2xl text-center">
+          <img
+            src={logoSrc}
+            alt="VNEXUS TEC"
+            className="mx-auto h-20 w-auto drop-shadow-[0_0_30px_rgba(15,76,255,0.35)]"
+          />
+          <div className="mt-8 inline-flex items-center gap-2 rounded-full border border-accent/40 bg-accent/10 px-4 py-1.5 text-xs font-semibold uppercase tracking-widest text-accent">
+            ✓ Briefing concluído
+          </div>
+          <h1 className="mt-5 text-3xl font-bold sm:text-5xl">
+            Você já concluiu este <span className="text-gradient-gold">briefing</span>.
+          </h1>
+          <p className="mx-auto mt-5 max-w-lg text-sm text-muted-foreground sm:text-base">
+            Nosso time já recebeu suas respostas. Se precisar de algo, estamos à disposição.
+          </p>
+
+          <div className="mt-10 flex flex-wrap items-center justify-center gap-3">
+            <button
+              onClick={handleNewBriefing}
+              className="rounded-lg bg-gradient-brand px-6 py-3 text-sm font-bold uppercase tracking-wider text-primary-foreground shadow-glow transition hover:scale-[1.02]"
+            >
+              Preencher novo briefing
+            </button>
+            <Link
+              to="/"
+              className="rounded-lg border border-border px-6 py-3 text-sm font-semibold text-muted-foreground transition hover:border-primary hover:text-foreground"
+            >
+              Voltar ao início
+            </Link>
+          </div>
+        </div>
       </div>
     );
   }
@@ -251,7 +336,6 @@ function BriefingPage() {
           </p>
         </header>
 
-        {/* Progress */}
         <div className="mb-8">
           <div className="mb-3 flex items-center justify-between text-xs font-medium uppercase tracking-wider text-muted-foreground">
             <span>
@@ -293,7 +377,6 @@ function BriefingPage() {
           </div>
         </div>
 
-        {/* Card */}
         <div
           key={current.id}
           className="animate-in fade-in slide-in-from-bottom-2 duration-500 rounded-2xl border border-border/60 bg-gradient-surface p-6 shadow-glow sm:p-10"
@@ -338,7 +421,7 @@ function BriefingPage() {
         </div>
 
         <div className="mt-6 flex items-center justify-between text-xs text-muted-foreground">
-          <span>💾 {saving ? "Salvando..." : "Progresso salvo automaticamente"}</span>
+          <span>{saving ? "Salvando..." : "Progresso salvo automaticamente"}</span>
           <button
             onClick={reset}
             className="underline-offset-2 hover:text-destructive hover:underline"
@@ -368,8 +451,7 @@ function ThankYou({ onNew }: { onNew: () => void }) {
         </h1>
         <p className="mx-auto mt-5 max-w-lg text-sm text-muted-foreground sm:text-base">
           Nossa equipe vai analisar suas respostas e entrará em contato em breve pelo WhatsApp ou
-          e-mail informado. Enquanto isso, você pode relaxar — o trabalho pesado agora é com a
-          gente. 🚀
+          e-mail informado.
         </p>
 
         <div className="mt-10 flex flex-wrap items-center justify-center gap-3">
@@ -585,7 +667,7 @@ function FieldInput({
                   key={i}
                   className="flex items-center justify-between rounded-md border border-border bg-input/30 px-3 py-2 text-xs"
                 >
-                  <span className="truncate font-medium text-foreground">📎 {f.name}</span>
+                  <span className="truncate font-medium text-foreground">{f.name}</span>
                   <button
                     type="button"
                     onClick={() => onChange(files.filter((_, idx) => idx !== i))}

@@ -234,8 +234,8 @@ Form Cliente VN Tec/
 **Fluxo**:
 1. Usuário acessa `/admin`
 2. Se não identificado: exibe formulário de login administrativo
-3. Após identificação, verifica se consta em `ADMIN_USERS`
-4. Se autorizado: exibe lista de briefings ordenada por data (decrescente)
+3. Preenche Nome + Identificador; validação é feita direto contra `ADMIN_USERS` **sem consultar Supabase**
+4. Se autorizado: cria profile manual via `setProfile()` e exibe dashboard
 5. Filtros: busca textual por ID do perfil, filtro por status
 6. Ao clicar em um briefing: exibe detalhes completos (todas as etapas)
 7. Ações: alterar status inline via select, excluir briefing com confirmação
@@ -316,8 +316,8 @@ Form Cliente VN Tec/
 ```
 1. Acessa /admin
 2. Se não identificado: preenche Nome + Identificador
-3. Sistema verifica se (full_name, phone_last4) consta em ADMIN_USERS
-4. Se autorizado: vê painel com lista de briefings
+3. Validação direta contra ADMIN_USERS (sem Supabase)
+4. Se autorizado: setProfile() manual + redireciona para dashboard
 5. Se não autorizado: mensagem de acesso negado
 6. Filtra briefings por status ou busca por ID do perfil
 7. Clica em briefing para ver detalhes completos
@@ -420,12 +420,14 @@ Form Cliente VN Tec/
 
 ### 6.4 Segurança
 
-- RLS (Row Level Security): **desabilitado** em ambas as tabelas
+- RLS (Row Level Security): **desabilitado** em ambas as tabelas (fix aplicado via migration `disable_rls_profiles` em 23/06/2026)
 - Função `is_admin()`: **removida**
 - Trigger `on_auth_user_created`: **removido**
 - Storage: políticas públicas para operações CRUD
 
-> Justificativa: O sistema utiliza identificação simplificada (Nome + WhatsApp), não autenticação forte. RLS e triggers do Supabase Auth foram removidos junto com o OAuth.
+> Justificativa: O sistema utiliza identificação simplificada (Nome + WhatsApp), não autenticação forte. RLS e triggers do Supabase Auth foram removidos junto com OAuth.
+>
+> ⚠️ Nota: RLS estava ativado na tabela `profiles` sem NENHUMA policy definida, o que bloqueava INSERTs do role `anon` mesmo com `GRANT ALL`. A migration `disable_rls_profiles` desabilitou RLS na tabela, resolvendo o erro "new row violates row-level security policy".
 
 ---
 
@@ -665,6 +667,12 @@ Para adicionar: editar a constante e rebuildar.
 | 23/06/2026 | Remoção de `inputMode="numeric"` e validação de dígitos no campo identificador | Permitir caracteres especiais como `{` e `}` |
 | 23/06/2026 | Adicionado "Limpar cache" e `clearIdentification()` no login admin | Stale profile no localStorage impedia login |
 | 23/06/2026 | Melhoria no tratamento de erros do `identify()` | Adicionado `console.error` nos blocos catch |
+| 23/06/2026 | Correção completa do fluxo de identificação e redirecionamento | Reset da sessão de correção |
+| 23/06/2026 | Admin bypass do Supabase: validação direta em `ADMIN_USERS` sem `identify()` | Login admin falhava se INSERT no Supabase retornasse erro |
+| 23/06/2026 | `index.tsx`: busca qualquer briefing (sem filtrar `completed`) antes de criar novo | Novo briefing era criado mesmo para usuário com briefing concluído |
+| 23/06/2026 | `identification.tsx`: exposto `setProfile` no context | Admin precisava definir profile manualmente sem Supabase |
+| 23/06/2026 | `supabase.ts`: `import createClient` movido para o topo | Import no final do arquivo podia causar erros em build |
+| 23/06/2026 | RLS desabilitado na tabela `profiles` via migration `disable_rls_profiles` | RLS estava ativado sem policies — bloqueava INSERT do role `anon` mesmo com `GRANT ALL` |
 
 ---
 
@@ -700,13 +708,13 @@ Para adicionar: editar a constante e rebuildar.
 
 ### 12.1 Bugs
 
-- Nenhum bug conhecido no momento.
+- Nenhum bug conhecido no momento. (Última correção: admin login passava pelo Supabase desnecessariamente — corrigido em 23/06/2026.)
 
 ### 12.2 Limitações
 
 - **Sem autenticação forte**: Qualquer pessoa que saiba Nome + WhatsApp de outro usuário pode acessar o briefing dele. Isto é uma escolha deliberada de design (simplicidade > segurança para este contexto).
 - **Admin depende de rebuild**: A lista `ADMIN_USERS` é hardcoded — requer rebuild do projeto para adicionar/remover administradores.
-- **Permissões de tabela**: Ao recriar tabelas via migration, as grants para a role `anon` podem ser perdidas — necessário reaplicar `GRANT ALL ON public.profiles TO anon`.
+- **Permissões de tabela**: Ao recriar tabelas via migration, as grants para a role `anon` podem ser perdidas — necessário reaplicar `GRANT ALL ON public.profiles TO anon`. (Atualmente OK — verificado em 23/06/2026.)
 - **Busca no admin limitada**: A busca no painel administrativo busca apenas por ID do perfil (não por nome ou telefone do cliente).
 - **Storage público**: O bucket `briefing_files` tem políticas públicas — qualquer pessoa pode listar/excluir arquivos.
 
@@ -737,10 +745,14 @@ Para adicionar: editar a constante e rebuildar.
 - **Backend**: Supabase Postgres + Storage
 - **Tabelas**: `profiles` (nova estrutura independente) e `briefings`
 - **Admin**: Configurado via constante `ADMIN_USERS` em `src/routes/admin.tsx` (`Admin VNEXUS` / `{0203}`)
+- **Admin login**: Bypass total do Supabase — validação direta contra `ADMIN_USERS`, profile criado via `setProfile()` manual
 - **Identificador admin**: Aceita qualquer caractere (incluindo `{` e `}`)
+- **Client flow**: `index.tsx` busca ANY briefing (sem filtrar `completed`) antes de decidir criar novo
+- **identification.tsx**: Expõe `setProfile()` para definição manual de profile (usado pelo admin)
+- **supabase.ts**: `import createClient` movido para o topo do arquivo
 - **Build**: ✅ TypeScript sem erros, ✅ Build completo, ✅ Sem referências OAuth
 - **Documentação**: Consolidada em `PROJECT_MASTER_CONTEXT.md`
-- **Permissões Supabase**: Grants da role `anon` reaplicadas manualmente via migration
+- **Permissões Supabase**: Grants da role `anon` confirmadas OK para `profiles` e `briefings`; RLS desabilitado em ambas as tabelas (migration `disable_rls_profiles`)
 
 ### Últimas Mudanças (23/06/2026)
 
@@ -756,6 +768,11 @@ Para adicionar: editar a constante e rebuildar.
 - Remoção de restrições de input no campo identificador (aceita `{` e `}`)
 - Adicionado "Limpar cache" e `clearIdentification()` no login admin
 - Melhoria no tratamento de erros do `identify()` com logs no console
+- **Admin bypass**: login admin agora valida direto em `ADMIN_USERS` sem chamar `identify()` (Supabase)
+- **`identification.tsx`**: exposto `setProfile()` para definição manual de profile
+- **`index.tsx`**: busca qualquer briefing (sem filtrar `completed`) antes de criar novo — evita duplicidade para usuários com briefing concluído
+- **`supabase.ts`**: `import createClient` movido para o topo do arquivo
+- **RLS**: Desabilitado RLS na tabela `profiles` via migration `disable_rls_profiles` — RLS ativado sem policies bloqueava INSERTs do role `anon`
 
 ### Instruções para Próximas Intervenções
 
@@ -763,10 +780,76 @@ Para adicionar: editar a constante e rebuildar.
 2. **Sempre atualizar este arquivo** após qualquer alteração — manter a seção 13 (Memória Permanente) e o histórico na seção 10.
 3. **Não criar novos arquivos de documentação (.md)** — toda documentação deve ficar neste arquivo.
 4. **Seguir as convenções** listadas na seção de identidade visual e na `AGENTS.md`.
+5. **Admin login não usa Supabase**: a validação é feita direto em `ADMIN_USERS` no código. Se precisar alterar credenciais admin, edite a constante em `src/routes/admin.tsx`.
+6. **`identification.tsx` expõe `setProfile()`**: pode ser usado para definir profile manualmente sem passar pelo Supabase (usado pelo admin).
 
 ---
 
-## 14. CHECKLIST DE SAÚDE DO PROJETO
+## 14. AJUDA — GUIA DE USO DO SISTEMA
+
+### 14.1 Acessar e Preencher um Briefing
+
+1. Abra o link do sistema (ex: `https://form.vnexustec.com.br`)
+2. Na landing page, preencha **Nome Completo** e **Últimos 4 dígitos do WhatsApp**
+3. Clique em **"Continuar"**
+4. O sistema identifica ou cadastra automaticamente o perfil
+5. Você é redirecionado ao formulário de briefing (7 etapas)
+6. Preencha cada etapa e clique **"Avançar"** para prosseguir
+7. Na última etapa, clique **"Enviar briefing"** para finalizar
+8. Pronto! Nossa equipe receberá suas respostas
+
+> Se você parar no meio do formulário, pode fechar a página. Ao acessar novamente, o sistema restaura exatamente de onde parou.
+
+### 14.2 Salvamento Automático
+
+- As respostas são salvas automaticamente no banco de dados após 1,5s sem alterações
+- Um indicador verde pulsante aparece no canto superior da barra de progresso durante o salvamento
+- O rodapé exibe "Salvando..." ou "Progresso salvo automaticamente"
+- Você pode fechar o navegador a qualquer momento que o progresso estará seguro
+
+### 14.3 Acessar o Painel Administrativo
+
+1. Na landing page, clique em **"Área Administrativa"** no rodapé (ou acesse `/admin` diretamente)
+2. Preencha **Nome Completo** (`Admin VNEXUS`) e **Identificador** (`{0203}`)
+3. Clique em **"Acessar painel"**
+4. No painel você pode:
+   - Ver todos os briefings recebidos (ordenados por data)
+   - Filtrar briefings por status
+   - Buscar por ID do perfil
+   - Clicar em um briefing para ver todos os detalhes
+   - Alterar status do briefing (ex: "Novo" → "Em análise")
+   - Excluir briefings (com confirmação)
+   - Encaminhar o briefing para IA (cópia em Markdown)
+
+> Caso o login admin falhe, use o botão **"Limpar cache"** e tente novamente.
+
+### 14.4 Briefing já Concluído
+
+Se você já enviou um briefing e tenta acessar `/briefing` novamente:
+- O sistema exibe a mensagem **"Você já concluiu este briefing"**
+- Você pode clicar em **"Preencher novo briefing"** para reiniciar
+- Ou clicar em **"Voltar ao início"**
+
+### 14.5 Problemas Comuns
+
+| Problema | Solução |
+|---|---|
+| Tela de erro ao identificar | Verifique se o Supabase está online. O erro é registrado no console (`[IDENTIFY]`). |
+| "Credenciais administrativas inválidas" | Confira se digitou exatamente `Admin VNEXUS` e `{0203}` (com chaves). Use "Limpar cache" se necessário. |
+| Briefing não carrega | Verifique se você passou pela identificação primeiro (acesse `/` e clique "Continuar"). |
+| Autosave não funciona | Verifique sua conexão de internet. O sistema tenta salvar mesmo em caso de falha (sem interromper o usuário). |
+| Perdeu o progresso | O briefing é recuperado automaticamente ao acessar `/briefing` novamente — desde que não tenha sido concluído. |
+
+### 14.6 Limpar Cache Local
+
+Se houver problemas com identificação (especialmente no admin):
+1. Clique em **"Limpar cache"** no formulário de login admin
+2. Ou limpe manualmente o `localStorage` do navegador para o site
+3. A chave armazenada é `vnexus.profile.v1`
+
+---
+
+## 15. CHECKLIST DE SAÚDE DO PROJETO
 
 ### Build
 
@@ -800,7 +883,7 @@ Para adicionar: editar a constante e rebuildar.
 | Tabela `profiles` | ✅ Criada com nova estrutura |
 | Tabela `briefings` | ✅ Atualizada com `profile_id` |
 | Índice único `(full_name, phone_last4)` | ✅ Criado |
-| RLS | ❌ Desabilitado (intencional) |
+| RLS | ❌ Desabilitado (intencional) — migration `disable_rls_profiles` |
 | Trigger auth | ❌ Removido |
 
 ### Storage
@@ -823,8 +906,9 @@ Para adicionar: editar a constante e rebuildar.
 ### Admin
 
 | Item | Status |
-|---|---|
+|---|---|---|
 | `ADMIN_USERS` configurado | ✅ (`Admin VNEXUS` / `{0203}`) |
+| Login bypass do Supabase | ✅ Validação direta em ADMIN_USERS |
 | Lista de briefings | ✅ Do Supabase |
 | Filtro por status | ✅ |
 | Mudança de status inline | ✅ |
@@ -842,6 +926,7 @@ Para adicionar: editar a constante e rebuildar.
 | Upload simulado | ✅ |
 | Submissão | ✅ |
 | Tela de agradecimento | ✅ |
+| Briefing concluído detectado | ✅ Tela "Você já concluiu" + opção novo briefing |
 
 ### Documentação
 

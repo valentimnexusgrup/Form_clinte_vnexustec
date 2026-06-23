@@ -2,6 +2,7 @@ import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
 import { useState } from "react";
 import logoSrc from "@/assets/vnexus-logo.svg";
 import { useIdentification } from "@/lib/identification";
+import { supabase } from "@/lib/supabase";
 
 export const Route = createFileRoute("/")({
   head: () => ({
@@ -29,24 +30,73 @@ function LandingPage() {
     e.preventDefault();
     setError("");
 
-    if (!fullName.trim()) {
+    const name = fullName.trim();
+    const phone = phoneLast4.trim();
+
+    if (!name) {
       setError("Informe seu nome completo.");
       return;
     }
-    if (!phoneLast4.trim() || phoneLast4.trim().length !== 4 || !/^\d{4}$/.test(phoneLast4.trim())) {
-      setError("Informe os 4 últimos dígitos do WhatsApp.");
+    if (!phone) {
+      setError("Informe os últimos 4 dígitos do WhatsApp.");
       return;
     }
 
     setSubmitting(true);
-    const profile = await identify(fullName.trim(), phoneLast4.trim());
-    setSubmitting(false);
+    console.log("[INDEX] identificando:", name, phone);
 
-    if (profile) {
-      navigate({ to: "/briefing" });
-    } else {
-      setError("Erro ao identificar. Tente novamente.");
+    const profile = await identify(name, phone);
+    if (!profile) {
+      setSubmitting(false);
+      setError("Não foi possível acessar o banco de dados. Verifique sua conexão.");
+      console.error("[INDEX] identify retornou null");
+      return;
     }
+
+    console.log("[INDEX] profile OK, verificando briefings existentes");
+
+    const { data: existingBriefings, error: briefingsError } = await supabase
+      .from("briefings")
+      .select("*")
+      .eq("profile_id", profile.id)
+      .order("created_at", { ascending: false })
+      .limit(1);
+
+    if (briefingsError) {
+      console.error("[INDEX] erro ao buscar briefings:", briefingsError.message);
+      setSubmitting(false);
+      setError("Não foi possível acessar o banco de dados. Verifique sua conexão.");
+      return;
+    }
+
+    const latestBriefing = existingBriefings && existingBriefings.length > 0 ? existingBriefings[0] : null;
+
+    if (latestBriefing) {
+      console.log("[INDEX] briefing encontrado, redirecionando:", latestBriefing.id, "completed:", latestBriefing.completed);
+      setSubmitting(false);
+      navigate({ to: "/briefing" });
+      return;
+    }
+
+    console.log("[INDEX] nenhum briefing encontrado, criando novo");
+
+    const { error: createError } = await supabase.from("briefings").insert({
+      profile_id: profile.id,
+      current_step: 0,
+      data: {},
+      other: {},
+    });
+
+    if (createError) {
+      console.error("[INDEX] erro ao criar briefing:", createError.message);
+      setError("Não foi possível criar seu briefing. Tente novamente.");
+      setSubmitting(false);
+      return;
+    }
+
+    console.log("[INDEX] briefing criado, redirecionando para /briefing");
+    setSubmitting(false);
+    navigate({ to: "/briefing" });
   };
 
   return (
@@ -91,7 +141,7 @@ function LandingPage() {
               inputMode="numeric"
               maxLength={4}
               value={phoneLast4}
-              onChange={(e) => setPhoneLast4(e.target.value.replace(/\D/g, ""))}
+              onChange={(e) => setPhoneLast4(e.target.value)}
               placeholder="4587"
               className="w-full rounded-lg border border-border bg-input/40 px-4 py-3 text-sm text-foreground placeholder:text-muted-foreground/60 transition focus:border-primary focus:bg-input/70 focus:outline-none focus:ring-2 focus:ring-primary/30"
               disabled={submitting}

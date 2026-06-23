@@ -44,7 +44,7 @@ const ADMIN_USERS = [
 ];
 
 function AdminPage() {
-  const { profile, loading: authLoading, identify, clearIdentification } = useIdentification();
+  const { profile, loading: authLoading, identify, setProfile, clearIdentification } = useIdentification();
   const navigate = useNavigate();
 
   const [briefings, setBriefings] = useState<BriefingRow[]>([]);
@@ -57,7 +57,6 @@ function AdminPage() {
   const [adminPhone, setAdminPhone] = useState("");
   const [adminError, setAdminError] = useState("");
   const [adminSubmitting, setAdminSubmitting] = useState(false);
-  const [cleared, setCleared] = useState(false);
 
   const isAdmin = profile
     ? ADMIN_USERS.some((u) => u.full_name === profile.full_name && u.phone_last4 === profile.phone_last4)
@@ -112,33 +111,41 @@ function AdminPage() {
     e.preventDefault();
     setAdminError("");
 
-    if (!adminName.trim()) {
+    const name = adminName.trim();
+    const identifier = adminPhone.trim();
+
+    if (!name) {
       setAdminError("Informe o nome do administrador.");
       return;
     }
-    if (!adminPhone.trim()) {
+    if (!identifier) {
       setAdminError("Informe o identificador.");
       return;
     }
 
-    clearIdentification();
-    setAdminSubmitting(true);
-    const p = await identify(adminName.trim(), adminPhone.trim());
-    setAdminSubmitting(false);
+    console.log("[ADMIN] login iniciado:", name, identifier);
 
-    if (!p) {
-      setAdminError("Erro ao identificar. Verifique o console do navegador (F12) para detalhes.");
-      return;
-    }
-
-    const allowed = ADMIN_USERS.some(
-      (u) => u.full_name === p.full_name && u.phone_last4 === p.phone_last4,
+    const matched = ADMIN_USERS.find(
+      (u) => u.full_name === name && u.phone_last4 === identifier,
     );
 
-    if (!allowed) {
-      setAdminError("Acesso não autorizado.");
+    if (!matched) {
+      console.warn("[ADMIN] credenciais inválidas:", name, identifier);
+      setAdminError("Credenciais administrativas inválidas.");
       return;
     }
+
+    console.log("[ADMIN] credenciais válidas, acesso liberado");
+    clearIdentification();
+    setProfile({
+      id: "admin",
+      full_name: matched.full_name,
+      phone_last4: matched.phone_last4,
+      created_at: new Date().toISOString(),
+      updated_at: new Date().toISOString(),
+    });
+    setAdminSubmitting(false);
+    navigate({ to: "/admin" });
   };
 
   if (authLoading) {
@@ -193,9 +200,6 @@ function AdminPage() {
             {adminError && (
               <p className="text-xs font-medium text-destructive">{adminError}</p>
             )}
-            {cleared && (
-              <p className="text-xs font-medium text-green-400">Cache limpo. Tente novamente.</p>
-            )}
             <button
               type="submit"
               disabled={adminSubmitting}
@@ -218,9 +222,7 @@ function AdminPage() {
             <button
               onClick={() => {
                 clearIdentification();
-                setCleared(true);
                 setAdminError("");
-                setTimeout(() => setCleared(false), 3000);
               }}
               className="text-xs text-muted-foreground/50 transition hover:text-destructive"
             >
