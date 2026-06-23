@@ -1,10 +1,13 @@
-<!-- LOVABLE:BEGIN -->
-> [!IMPORTANT]
-> This project is connected to [Lovable](https://lovable.dev). Avoid rewriting
-> published git history — force pushing, or rebasing/amending/squashing commits
-> that are already pushed — as it rewrites history on Lovable's side and the
-> user will likely lose their project history.
->
-> Commits you push to the connected branch sync back to Lovable and show up in
-> the editor, so keep the branch in a working state.
-<!-- LOVABLE:END -->
+# AGENTS.md
+
+## Convenções do Projeto
+
+- Utilize TypeScript estrito para todo código novo.
+- Siga o padrão de componentes funcionais com hooks.
+- Utilize as variáveis CSS customizadas do tema (`--nexus`, `--quantum`, `--prestige`, `--graphite`, `--tech`).
+- Prefira as classes utilitárias do design system: `bg-gradient-brand`, `text-gradient-gold`, `shadow-glow`, `shadow-gold`.
+- Mantenha os componentes de UI em `src/components/ui/` (shadcn/ui).
+- Mantenha a lógica de negócio em `src/lib/`.
+- Para chaves de `localStorage`, use o formato `vnexus.<contexto>.v<versão>`.
+- Todo acesso a `window`, `localStorage` ou `sessionStorage` deve ter guarda `typeof window === "undefined"`.
+- Commit messages devem ser descritivas em português.

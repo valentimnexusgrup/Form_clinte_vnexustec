@@ -1,11 +1,16 @@
 import { useMemo, useState } from "react";
-import logoAsset from "@/assets/vnexus-logo.png.asset.json";
+import logoSrc from "@/assets/vnexus-logo.svg";
 import { steps } from "@/lib/briefing-schema";
 
 export type Value = string | string[] | { name: string; size: number }[];
 export type FormState = Record<string, Value>;
 
-export type SubmissionStatus = "Novo" | "Em análise" | "Aguardando cliente" | "Aprovado" | "Concluído";
+export type SubmissionStatus =
+  | "Novo"
+  | "Em análise"
+  | "Aguardando cliente"
+  | "Aprovado"
+  | "Concluído";
 
 export type Submission = {
   id: string;
@@ -121,7 +126,7 @@ export function Summary({
     <div className="min-h-screen px-4 py-10 sm:py-16">
       <div className="mx-auto max-w-4xl">
         <header className="mb-10 text-center">
-          <img src={logoAsset.url} alt="VNEXUS TEC" className="mx-auto h-16 w-auto" />
+          <img src={logoSrc} alt="VNEXUS TEC" className="mx-auto h-16 w-auto" />
           <div className="mt-6 inline-flex items-center gap-2 rounded-full border border-accent/40 bg-accent/10 px-4 py-1.5 text-xs font-semibold uppercase tracking-widest text-accent">
             ✓ {title}
           </div>
@@ -146,7 +151,10 @@ export function Summary({
 
         <div className="grid gap-4 sm:grid-cols-2">
           {steps.map((step) => (
-            <div key={step.id} className="rounded-2xl border border-border/60 bg-gradient-surface p-5 shadow-glow">
+            <div
+              key={step.id}
+              className="rounded-2xl border border-border/60 bg-gradient-surface p-5 shadow-glow"
+            >
               <h3 className="mb-3 flex items-center gap-2 text-sm font-bold uppercase tracking-wider text-gradient-gold">
                 {step.title}
               </h3>
@@ -161,7 +169,10 @@ export function Summary({
                         : (v as { name: string }[]).map((x) => x.name).join(", ")
                     : (v as string) || "—";
                   return (
-                    <div key={f.id} className="flex flex-col gap-0.5 border-b border-border/40 pb-2 last:border-0">
+                    <div
+                      key={f.id}
+                      className="flex flex-col gap-0.5 border-b border-border/40 pb-2 last:border-0"
+                    >
                       <dt className="text-xs font-medium text-muted-foreground">{f.label}</dt>
                       <dd className="break-words text-foreground">{display}</dd>
                     </div>

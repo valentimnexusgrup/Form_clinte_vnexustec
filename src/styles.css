@@ -44,11 +44,11 @@
   --radius: 0.875rem;
 
   /* Brand palette */
-  --nexus: oklch(0.255 0.085 264);      /* #0A1F44 Azul Nexus */
-  --quantum: oklch(0.55 0.245 264);     /* #0F4CFF Azul Quântico */
-  --prestige: oklch(0.755 0.13 86);     /* #D4AF37 Dourado Prestige */
-  --graphite: oklch(0.205 0.025 264);   /* #121826 Grafite Deep */
-  --tech: oklch(0.985 0.005 240);       /* #F8FAFC Branco Tech */
+  --nexus: oklch(0.255 0.085 264); /* #0A1F44 Azul Nexus */
+  --quantum: oklch(0.55 0.245 264); /* #0F4CFF Azul Quântico */
+  --prestige: oklch(0.755 0.13 86); /* #D4AF37 Dourado Prestige */
+  --graphite: oklch(0.205 0.025 264); /* #121826 Grafite Deep */
+  --tech: oklch(0.985 0.005 240); /* #F8FAFC Branco Tech */
 
   --background: var(--graphite);
   --foreground: var(--tech);
@@ -78,8 +78,11 @@
 }
 
 @layer base {
-  * { border-color: var(--color-border); }
-  html, body {
+  * {
+    border-color: var(--color-border);
+  }
+  html,
+  body {
     background: var(--color-background);
     color: var(--color-foreground);
     font-family: var(--font-sans);
@@ -94,11 +97,21 @@
 }
 
 @layer utilities {
-  .bg-gradient-brand { background-image: var(--gradient-brand); }
-  .bg-gradient-gold { background-image: var(--gradient-gold); }
-  .bg-gradient-surface { background-image: var(--gradient-surface); }
-  .shadow-glow { box-shadow: var(--shadow-glow); }
-  .shadow-gold { box-shadow: var(--shadow-gold); }
+  .bg-gradient-brand {
+    background-image: var(--gradient-brand);
+  }
+  .bg-gradient-gold {
+    background-image: var(--gradient-gold);
+  }
+  .bg-gradient-surface {
+    background-image: var(--gradient-surface);
+  }
+  .shadow-glow {
+    box-shadow: var(--shadow-glow);
+  }
+  .shadow-gold {
+    box-shadow: var(--shadow-gold);
+  }
   .text-gradient-gold {
     background: var(--gradient-gold);
     -webkit-background-clip: text;
