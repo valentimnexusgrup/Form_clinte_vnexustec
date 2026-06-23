@@ -147,7 +147,8 @@ Form Cliente VN Tec/
 ├── eslint.config.js                  # ESLint flat config
 ├── package.json                      # Dependências e scripts
 ├── tsconfig.json                     # TypeScript strict config
-└── vite.config.ts                    # Vite config com plugins manuais
+├── vercel.json                       # Configuração de deploy Vercel (TanStack Start + Nitro)
+└── vite.config.ts                    # Vite config com plugins manuais (inclui nitro())
 ```
 
 ### Finalidade dos diretórios
@@ -451,9 +452,9 @@ Nenhuma configuração especial necessária no dashboard — OAuth foi removido.
 ### 7.3 Configurações do Vite
 
 | Opção | Valor |
-|---|---|
+|---|---|---|
 | `envPrefix` | `"VITE_"` |
-| Plugins | `@tanstack/react-start`, `@vitejs/plugin-react`, `@tailwindcss/vite`, `vite-tsconfig-paths` |
+| Plugins | `@tanstack/react-start`, `nitro/vite`, `@vitejs/plugin-react`, `@tailwindcss/vite`, `vite-tsconfig-paths` |
 | Type | Rolldown (Vite 8) |
 
 ### 7.4 Configurações do TanStack
@@ -684,6 +685,7 @@ Para adicionar: editar a constante e rebuildar.
 | 23/06/2026 | Substituição da logo SVG por WebP | Todos os imports de `vnexus-logo.svg` trocados para `vnexus-logo.webp` em 4 arquivos. O SVG permanece em disco mas não é mais importado. |
 | 23/06/2026 | Correção de segurança: placeholders do login admin não expõem mais credenciais | `placeholder="Admin VNEXUS"` → `"Digite seu nome"` e `placeholder="{0203}"` → `"Digite seu identificador"` em `admin.tsx`. Credenciais reais não são mais visíveis na interface. |
 | 23/06/2026 | Redimensionamento da logo em todas as páginas | Logo aumentada de tamanhos variados (`h-10`, `h-16`, `h-20`, `h-24`) para largura padronizada `w-44` (~176px) com `h-auto object-contain` e `draggable={false}` em todas as 7 ocorrências nos 4 arquivos. |
+| 23/06/2026 | Correção deploy Vercel — erro 404 NOT_FOUND | TanStack Start com SSR precisava do plugin `nitro/vite` para produzir output compatível com Vercel. Instalado `nitro` (`^3.0.260610-beta`), adicionado `nitro()` ao `vite.config.ts`, criado `vercel.json` com `framework: null` e output `.vercel/output/static`, adicionado script `start` (`node .output/server/index.mjs`). |
 
 ---
 
@@ -710,7 +712,7 @@ Para adicionar: editar a constante e rebuildar.
 - [ ] Política de privacidade e termos de uso
 - [ ] Modo claro (light mode)
 - [ ] Internacionalização (i18n)
-- [ ] CI/CD automatizado
+- [ ] CI/CD automatizado (Vercel já faz deploy automático por branch)
 - [ ] Página de perfil do usuário (/perfil)
 
 ---
@@ -718,6 +720,8 @@ Para adicionar: editar a constante e rebuildar.
 ## 12. PROBLEMAS CONHECIDOS
 
 ### 12.1 Bugs
+
+- ~~Deploy Vercel retornava `404: NOT_FOUND` — SSR não funcionava.~~ (Corrigido em 23/06/2026 — causa: faltava plugin `nitro/vite` no `vite.config.ts` e `vercel.json` na raiz. Solução: instalado `nitro`, adicionado `nitro()` plugin, criado `vercel.json`.)
 
 - ~~Navegação para `/admin` não funcionava — link congelava sem resposta.~~ (Corrigido em 23/06/2026 — causa: cache desatualizado do Vite/router. Solução: limpeza de cache + regeneração da route tree.)
 - ~~Campo de busca no admin com fundo branco e texto branco — conteúdo invisível.~~ (Corrigido em 23/06/2026 — aplicado estilo dark `bg-white/5 text-white placeholder:text-white/40`.)
@@ -731,6 +735,7 @@ Para adicionar: editar a constante e rebuildar.
 - **Permissões de tabela**: Ao recriar tabelas via migration, as grants para a role `anon` podem ser perdidas — necessário reaplicar `GRANT ALL ON public.profiles TO anon`. (Atualmente OK — verificado em 23/06/2026.)
 - **Busca no admin limitada**: A busca no painel administrativo busca por nome do cliente via `profiles.full_name` (não por telefone). UUID do perfil é exibido como texto secundário.
 - **Storage público**: O bucket `briefing_files` tem políticas públicas — qualquer pessoa pode listar/excluir arquivos.
+- **Deploy Vercel depende do Nitro**: O plugin `nitro/vite` é necessário para produzir output compatível com Vercel. Sem ele, o build produz apenas `dist/` (não utilizável pela Vercel para SSR), causando 404.
 
 ### 12.3 Riscos Técnicos
 
@@ -752,7 +757,7 @@ Para adicionar: editar a constante e rebuildar.
 
 > Esta seção deve ser atualizada a cada alteração futura. Reflete o estado atual do sistema e serve como contexto para futuras IAs.
 
-### Estado Atual (23/06/2026)
+### Estado Atual (23/06/2026 — pós correção deploy Vercel)
 
 - **Sistema de acesso**: Identificação por Nome Completo + últimos 4 dígitos do WhatsApp
 - **Autenticação**: Nenhuma — OAuth removido
@@ -765,13 +770,15 @@ Para adicionar: editar a constante e rebuildar.
 - **identification.tsx**: Expõe `setProfile()` para definição manual de profile (usado pelo admin)
 - **supabase.ts**: `import createClient` movido para o topo do arquivo
 - **Build**: ✅ TypeScript sem erros, ✅ Build completo, ✅ Sem referências OAuth
+- **Deploy**: Vercel com Nitro (`nitro/vite` plugin) — `.output/` local, `.vercel/output/` no Vercel
+- **Vercel**: `.vercel.json` na raiz com framework `null`, buildCommand `npm run build`, outputDirectory `.vercel/output/static`
 - **Documentação**: Consolidada em `PROJECT_MASTER_CONTEXT.md`
 - **Busca admin**: Baseada em `profiles.full_name` via join Supabase `select("*, profiles(full_name)")` — UUID exibido como texto secundário
 - **Campo de busca admin**: Estilo dark `bg-white/5 text-white placeholder:text-white/40` com `border-white/10`
 - **Tipagem**: `BriefingRow.profiles?.full_name` disponível para acesso ao nome do cliente
 - **Permissões Supabase**: Grants da role `anon` confirmadas OK para `profiles` e `briefings`; RLS desabilitado em ambas as tabelas (migration `disable_rls_profiles`)
 
-### Últimas Mudanças (23/06/2026)
+### Últimas Mudanças (23/06/2026 — tarde)
 
 - Refatoração completa do sistema de acesso: Google OAuth → identificação simplificada
 - Recriação da tabela `profiles`: agora independente, com `full_name` + `phone_last4`
@@ -799,6 +806,7 @@ Para adicionar: editar a constante e rebuildar.
 - **Logo SVG → WebP**: Todos os 4 imports de `vnexus-logo.svg` substituídos por `vnexus-logo.webp` (`index.tsx`, `admin.tsx`, `briefing.tsx`, `briefing-summary.tsx`). O SVG permanece em disco. Nenhuma classe ou dimensão alterada.
 - **Segurança: placeholders do login admin sanitizados**: `placeholder="Admin VNEXUS"` removido (substituído por `"Digite seu nome"`) e `placeholder="{0203}"` removido (substituído por `"Digite seu identificador"`) em `admin.tsx` — as credenciais reais não ficam mais expostas visualmente na interface de login.
 - **Redimensionamento da logo**: Todas as 7 ocorrências da logo nos 4 arquivos (`index.tsx`, `admin.tsx`, `briefing.tsx`, `briefing-summary.tsx`) tiveram suas classes Tailwind alteradas de altura fixa (`h-10`, `h-16`, `h-20`, `h-24`) para largura padronizada `w-44 h-auto object-contain` com `draggable={false}`.
+- **23/06/2026 — Correção deploy Vercel (404 NOT_FOUND)**: Instalação do pacote `nitro` (v3.0.260610-beta), adição do plugin `nitro()` no `vite.config.ts`, criação do `vercel.json` na raiz com `framework: null`, `outputDirectory: .vercel/output/static` e `buildCommand: npm run build`. Adicionado script `start` no `package.json` (`node .output/server/index.mjs`). Build verificado localmente — client, SSR e Nitro compilam sem erros.
 
 ### Instruções para Próximas Intervenções
 
@@ -875,14 +883,68 @@ Se houver problemas com identificação (especialmente no admin):
 
 ---
 
-## 15. CHECKLIST DE SAÚDE DO PROJETO
+## 15.1 Configurações de Deploy (Vercel)
+
+### 15.1.1 Arquivos de Configuração
+
+| Arquivo | Finalidade |
+|---|---|
+| `vercel.json` (raiz) | Configuração de build e output para Vercel |
+| `vite.config.ts` (plugin `nitro()`) | Plugin Nitro necessário para output Vercel-compatível |
+| `package.json` (script `start`) | Entry point Node.js (`node .output/server/index.mjs`) |
+
+### 15.1.2 vercel.json
+
+```json
+{
+  "buildCommand": "npm run build",
+  "outputDirectory": ".vercel/output/static",
+  "framework": null,
+  "installCommand": "npm install",
+  "devCommand": "npm run dev"
+}
+```
+
+### 15.1.3 Fluxo de Build no Vercel
+
+1. Vercel executa `npm install` (installCommand)
+2. Vercel executa `npm run build` (buildCommand)
+3. O plugin `nitro/vite` detecta ambiente Vercel (`VERCEL` env var) e usa preset `vercel`
+4. Nitro produz output no formato Build Output API v3 (`.vercel/output/`)
+   - `.vercel/output/static/` → assets estáticos (JS, CSS, imagens)
+   - `.vercel/output/functions/__nitro.func/` → serverless function SSR
+   - `.vercel/output/config.json` → configuração de rotas gerada pelo Nitro
+5. Vercel serve o app: assets direto do static, demais rotas via serverless function
+
+### 15.1.4 Variáveis de Ambiente (Vercel Dashboard)
+
+As seguintes variáveis DEVEM estar configuradas no painel da Vercel (Settings → Environment Variables):
+
+| Variável | Obrigatória | Valor (exemplo) |
+|---|---|---|
+| `VITE_SUPABASE_URL` | Sim | `https://fwaiaxfbyuvjqelvuivz.supabase.co` |
+| `VITE_SUPABASE_ANON_KEY` | Sim | Chave anônima do Supabase |
+
+> **Nota**: Como as variáveis têm prefixo `VITE_`, o Vite as inlineia no bundle do cliente durante o build e o Nitro as disponibiliza no servidor SSR em runtime. Ambas precisam estar disponíveis no ambiente de build da Vercel.
+
+### 15.1.5 Debug
+
+| Problema | Causa Provável | Solução |
+|---|---|---|
+| `404: NOT_FOUND` no preview | Nitro não configurado ou preset errado | Verificar `nitro()` plugin no `vite.config.ts` e `vercel.json` |
+| Erro 500 no SSR | Variável de ambiente ausente | Verificar `VITE_SUPABASE_URL` e `VITE_SUPABASE_ANON_KEY` no Vercel Dashboard |
+| Build local vs Vercel diferentes | Preset local (`node-server`) vs Vercel (`vercel`) | Comportamento esperado — o Nitro auto-detecta o ambiente |
+
+---
+
+## 16. CHECKLIST DE SAÚDE DO PROJETO
 
 ### Build
 
 | Item | Status |
 |---|---|
 | `npx tsc --noEmit` | ✅ Sem erros |
-| `npm run build` | ✅ Completo |
+| `npm run build` | ✅ Completo (client + SSR + Nitro) |
 | `npm run lint` | ✅ Sem erros |
 
 ### TypeScript
@@ -899,6 +961,7 @@ Se houver problemas com identificação (especialmente no admin):
 |---|---|
 | `@supabase/supabase-js` | ✅ Instalado |
 | `@tanstack/react-*` | ✅ Instalados |
+| `nitro` | ✅ Instalado (v3.0.260610-beta) |
 | `@radix-ui/*` | ✅ Instalados |
 | Dependências não utilizadas | ⚠️ Recharts, Carousel, Vaul, Sonner, react-day-picker, react-hook-form, zod |
 
