@@ -460,44 +460,54 @@ function BriefingDetail({
   const isVideoUrl = (url: string) => /\.(mp4|webm|mov)(\?.*)?$/i.test(url);
   const getFileName = (url: string) => url.split("/").pop() || "arquivo";
 
+  const isUrl = (v: unknown): v is string => typeof v === "string" && v.startsWith("https://");
+
+  const hasUrlValue = (val: string | string[]): boolean => {
+    if (!val) return false;
+    if (Array.isArray(val)) {
+      if (val.length === 0) return false;
+      return val.some((v) => isUrl(v));
+    }
+    return isUrl(val);
+  };
+
   const renderFileValue = (val: string | string[]) => {
-    const urls = Array.isArray(val) ? val : [val];
+    const raw = Array.isArray(val) ? val : [val];
+    const urls = raw.filter((v): v is string => isUrl(v));
+    if (urls.length === 0) return null;
     return (
       <div className="flex flex-col gap-2">
-        {urls.map((url, i) => {
-          if (!url || typeof url !== "string") return null;
-          return (
-            <div
-              key={i}
-              className="flex flex-col gap-1.5 rounded-lg border border-border/40 bg-muted/20 p-2"
-            >
-              {isImageUrl(url) ? (
-                <img
-                  src={url}
-                  alt={getFileName(url)}
-                  className="max-h-48 w-full rounded object-contain"
-                  loading="lazy"
-                />
-              ) : isVideoUrl(url) ? (
-                <video controls className="max-h-48 w-full rounded" preload="metadata">
-                  <source src={url} />
-                </video>
-              ) : null}
-              <div className="flex items-center gap-2">
-                <span className="truncate text-xs text-muted-foreground">{getFileName(url)}</span>
-                <a
-                  href={url}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="inline-flex items-center gap-1 rounded bg-primary/20 px-2 py-1 text-[10px] font-semibold uppercase tracking-wider text-primary transition hover:bg-primary/30"
-                >
-                  <Download className="h-3 w-3" />
-                  Baixar
-                </a>
-              </div>
+        {urls.map((url, i) => (
+          <div
+            key={i}
+            className="flex flex-col gap-1.5 rounded-lg border border-border/40 bg-muted/20 p-2"
+          >
+            {isImageUrl(url) ? (
+              <img
+                src={url}
+                alt={getFileName(url)}
+                className="max-h-48 w-full rounded object-contain"
+                loading="lazy"
+              />
+            ) : isVideoUrl(url) ? (
+              <video controls className="max-h-48 w-full rounded" preload="metadata">
+                <source src={url} />
+              </video>
+            ) : null}
+            <div className="flex items-center gap-2">
+              <span className="truncate text-xs text-muted-foreground">{getFileName(url)}</span>
+              <a
+                href={url}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="inline-flex items-center gap-1 rounded bg-primary/20 px-2 py-1 text-[10px] font-semibold uppercase tracking-wider text-primary transition hover:bg-primary/30"
+              >
+                <Download className="h-3 w-3" />
+                Baixar
+              </a>
             </div>
-          );
-        })}
+          </div>
+        ))}
       </div>
     );
   };
@@ -559,8 +569,10 @@ function BriefingDetail({
                   <p className="mb-1 text-[10px] font-semibold uppercase tracking-widest text-muted-foreground">
                     {field.label}
                   </p>
-                  {fileFieldIds.has(field.id) ? (
+                  {fileFieldIds.has(field.id) && hasUrlValue(val) ? (
                     renderFileValue(val)
+                  ) : fileFieldIds.has(field.id) ? (
+                    <p className="text-sm italic text-muted-foreground">Não informado</p>
                   ) : (
                     <p className="whitespace-pre-wrap text-sm leading-relaxed">
                       {Array.isArray(val) ? val.join(", ") : val || "—"}

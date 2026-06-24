@@ -241,10 +241,12 @@ Form Cliente VN Tec/
 6. Ao clicar em um briefing: exibe detalhes completos (todas as etapas)
 7. Ações: alterar status inline via select, excluir briefing com confirmação
 8. Arquivos enviados pelo cliente (imagens, vídeos, documentos) são exibidos com:
+   - Validação: o valor só é renderizado como arquivo se começa com `https://` (URL pública do Supabase Storage)
    - Preview inline de imagem (`<img>`) para .jpg, .jpeg, .png, .webp, .gif
    - Preview inline de vídeo (`<video controls>`) para .mp4, .webm, .mov
    - Botão "Baixar" com ícone que abre a URL pública em nova aba
    - Nome do arquivo exibido como texto ao lado do botão
+   - Se o campo estiver vazio ou o valor não for URL, exibe "Não informado"
 9. Botão "📋 Copiar briefing para IA" que gera Markdown estruturado com todas as respostas do cliente (organizado por etapa, com nome do cliente e data) e copia para a área de transferência com feedback visual "✅ Copiado!" por 2 segundos
 
 **Status disponíveis**: Novo, Em análise, Em produção, Aguardando aprovação, Aprovado, Arquivado
@@ -283,7 +285,7 @@ Form Cliente VN Tec/
 
 **Objetivo**: Simular upload de logo e materiais para o briefing.
 
-**Estado**: Implementação real — arquivos são enviados ao bucket `briefing_files` no Supabase Storage seguindo o padrão `{profile_id}/{field_id}/{timestamp}-{filename}`. A URL pública é armazenada no JSONB do briefing (campo `data`).
+**Estado**: Implementação real — arquivos são enviados ao bucket `briefing_files` no Supabase Storage seguindo o padrão `{profile_id}/{field_id}/{timestamp}-{filename}`. A URL pública é armazenada no JSONB do briefing (campo `data`). Em caso de erro no upload, mensagem visível ao usuário é exibida. Após upload bem-sucedido, o formulário exibe preview da imagem (thumb 48×48) ou badge de extensão, com opção de "Adicionar mais arquivos".
 
 **Bucket**: `briefing_files` — configurado com políticas públicas.
 
@@ -696,6 +698,7 @@ Para adicionar: editar a constante e rebuildar.
 | 23/06/2026 | Download e preview de arquivos no admin | `admin.tsx`: campos do tipo `file` renderizam preview inline de imagens/vídeos + botão "Baixar" com ícone |
 | 23/06/2026 | Botão "Copiar briefing para IA" no admin | `admin.tsx`: gera Markdown estruturado com `buildBriefing()` aprimorada, copia para clipboard com feedback visual |
 | 23/06/2026 | `buildBriefing()` aprimorada | `briefing-summary.tsx`: suporte a `clientName`/`date`, etapas numeradas, "Não informado" para campos vazios, URLs de arquivos |
+| 23/06/2026 | Correção upload + preview arquivos | `briefing.tsx`: exibição de erro visível ao usuário, preview de imagem após upload, esconde zona de upload após envio com "Adicionar mais arquivos". `admin.tsx`: `renderFileValue` valida se valor é URL (`startsWith('https://')`) antes de renderizar; se não for URL, exibe "Não informado". |
 
 ---
 
@@ -820,6 +823,8 @@ Para adicionar: editar a constante e rebuildar.
 - **23/06/2026 — Download e preview de arquivos no admin**: Em `admin.tsx`, o `BriefingDetail` identifica campos do tipo `file` e renderiza preview inline de imagens (`<img>`) e vídeos (`<video controls>`), com botão "Baixar" (ícone `Download` do lucide-react) que abre a URL pública em nova aba.
 - **23/06/2026 — Botão "Copiar briefing para IA" no admin**: Em `admin.tsx`, adicionado botão destacado "📋 Copiar briefing para IA" que gera Markdown estruturado (via `buildBriefing()` aprimorada) com nome do cliente, data de envio, etapas numeradas, URLs de arquivos e "Não informado" para campos vazios. Copia para clipboard com feedback visual "✅ Copiado!" por 2 segundos.
 - **23/06/2026 — `buildBriefing()` aprimorada**: Em `briefing-summary.tsx`, a função `buildBriefing()` agora aceita parâmetros opcionais `clientName` e `date`, inclui numeração de etapas (`## Etapa X — Nome`), exibe "Não informado" para campos vazios, e mostra URLs de arquivos no lugar dos nomes.
+- **23/06/2026 — Correção upload + preview arquivos no formulário**: Em `briefing.tsx`, o componente `FieldInput` do tipo `file` agora: exibe mensagem de erro visível ao usuário quando upload falha (`uploadError` state + `<p className="text-destructive">`); exibe preview de imagem (thumb 48×48) após upload bem-sucedido; esconde a zona de upload principal e mostra botão "Adicionar mais arquivos" quando já há arquivos enviados; mostra spinner de loading com texto "Enviando arquivos..." durante o upload.
+- **23/06/2026 — Correção validação de URL no admin**: Em `admin.tsx`, a função `renderFileValue` e o rendering de campos de arquivo agora validam se o valor começa com `https://` antes de tentar renderizar como arquivo. Se o valor não for uma URL (ex: dados no formato antigo `{name, size}`), o campo exibe "Não informado". Adicionadas funções auxiliares `isUrl()` e `hasUrlValue()` para validação.
 
 ### Instruções para Próximas Intervenções
 

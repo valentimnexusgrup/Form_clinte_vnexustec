@@ -497,6 +497,7 @@ function FieldInput({
   profileId: string;
 }) {
   const [uploading, setUploading] = useState(false);
+  const [uploadError, setUploadError] = useState("");
   const labelEl = (
     <label className="mb-2 flex items-baseline justify-between gap-3">
       <span className="text-sm font-semibold text-foreground">
@@ -636,23 +637,34 @@ function FieldInput({
     case "file": {
       const urls = Array.isArray(value) ? (value as string[]) : [];
 
+      const isImageUrl = (url: string) => /\.(jpg|jpeg|png|webp|gif)(\?.*)?$/i.test(url);
+
       const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
         const files = Array.from(e.target.files || []);
         if (files.length === 0 || !profileId) return;
 
+        setUploadError("");
         setUploading(true);
         try {
           const uploadedUrls: string[] = [];
           for (const file of files) {
             try {
               const filePath = `${profileId}/${field.id}/${Date.now()}-${file.name}`;
-              await supabase.storage.from("briefing_files").upload(filePath, file);
+              const { error: supaError } = await supabase.storage
+                .from("briefing_files")
+                .upload(filePath, file);
+              if (supaError) {
+                console.error("[BRIEFING] upload error:", file.name, supaError.message);
+                setUploadError(`Erro ao enviar "${file.name}": ${supaError.message}`);
+                continue;
+              }
               const {
                 data: { publicUrl },
               } = supabase.storage.from("briefing_files").getPublicUrl(filePath);
               uploadedUrls.push(publicUrl);
             } catch (err) {
               console.error("[BRIEFING] upload error for file:", file.name, err);
+              setUploadError(`Erro ao enviar "${file.name}". Tente novamente.`);
             }
           }
           if (uploadedUrls.length > 0) {
@@ -667,59 +679,82 @@ function FieldInput({
       return (
         <div>
           {labelEl}
-          <label className="flex cursor-pointer flex-col items-center justify-center gap-2 rounded-lg border-2 border-dashed border-border bg-input/20 px-6 py-8 text-center transition hover:border-primary hover:bg-input/40">
-            <svg
-              className="h-8 w-8 text-muted-foreground"
-              viewBox="0 0 24 24"
-              fill="none"
-              stroke="currentColor"
-              strokeWidth="1.5"
-            >
-              <path
-                d="M12 16V4m0 0l-4 4m4-4l4 4M4 20h16"
-                strokeLinecap="round"
-                strokeLinejoin="round"
+
+          {urls.length === 0 && !uploading && (
+            <label className="flex cursor-pointer flex-col items-center justify-center gap-2 rounded-lg border-2 border-dashed border-border bg-input/20 px-6 py-8 text-center transition hover:border-primary hover:bg-input/40">
+              <svg
+                className="h-8 w-8 text-muted-foreground"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                strokeWidth="1.5"
+              >
+                <path
+                  d="M12 16V4m0 0l-4 4m4-4l4 4M4 20h16"
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                />
+              </svg>
+              <span className="text-sm font-medium text-foreground">
+                Clique para enviar arquivos
+              </span>
+              <span className="text-xs text-muted-foreground">ou arraste e solte aqui</span>
+              <input
+                type="file"
+                multiple
+                className="hidden"
+                disabled={uploading}
+                onChange={handleFileUpload}
               />
-            </svg>
-            <span className="text-sm font-medium text-foreground">
-              {uploading ? "Enviando..." : "Clique para enviar arquivos"}
-            </span>
-            <span className="text-xs text-muted-foreground">ou arraste e solte aqui</span>
-            <input
-              type="file"
-              multiple
-              className="hidden"
-              disabled={uploading}
-              onChange={handleFileUpload}
-            />
-          </label>
+            </label>
+          )}
+
+          {uploading && (
+            <div className="flex flex-col items-center justify-center gap-3 rounded-lg border-2 border-dashed border-border bg-input/20 px-6 py-8 text-center">
+              <span className="h-6 w-6 animate-spin rounded-full border-2 border-primary border-t-transparent" />
+              <span className="text-sm text-muted-foreground">Enviando arquivos...</span>
+            </div>
+          )}
+
           {urls.length > 0 && (
-            <ul className="mt-3 space-y-1.5">
+            <div className="space-y-2">
               {urls.map((url, i) => (
-                <li
+                <div
                   key={i}
-                  className="flex items-center justify-between gap-2 rounded-md border border-border bg-input/30 px-3 py-2 text-xs"
+                  className="flex items-center gap-3 rounded-lg border border-border/40 bg-muted/20 p-3"
                 >
-                  <span className="truncate font-medium text-foreground">
+                  {isImageUrl(url) ? (
+                    <img src={url} alt="" className="h-12 w-12 shrink-0 rounded object-cover" />
+                  ) : (
+                    <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded bg-muted/40 text-xs text-muted-foreground">
+                      {url.split(".").pop()?.toUpperCase() || "FILE"}
+                    </div>
+                  )}
+                  <span className="flex-1 truncate text-sm font-medium text-foreground">
                     {url.split("/").pop()}
                   </span>
                   <button
                     type="button"
                     onClick={() => onChange(urls.filter((_, idx) => idx !== i))}
-                    className="shrink-0 text-muted-foreground hover:text-destructive"
+                    className="shrink-0 text-xs text-muted-foreground hover:text-destructive"
                   >
                     Remover
                   </button>
-                </li>
+                </div>
               ))}
-            </ul>
-          )}
-          {uploading && (
-            <div className="mt-2 flex items-center gap-2 text-xs text-muted-foreground">
-              <span className="h-2 w-2 animate-pulse rounded-full bg-accent" />
-              Enviando arquivos...
+              {!uploading && (
+                <label className="flex cursor-pointer items-center justify-center gap-2 rounded-lg border border-dashed border-border py-3 text-xs text-muted-foreground transition hover:border-primary hover:text-foreground">
+                  + Adicionar mais arquivos
+                  <input type="file" multiple className="hidden" onChange={handleFileUpload} />
+                </label>
+              )}
             </div>
           )}
+
+          {uploadError && (
+            <p className="mt-2 text-xs font-medium text-destructive">{uploadError}</p>
+          )}
+
           {hintEl}
         </div>
       );
