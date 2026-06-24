@@ -240,10 +240,16 @@ Form Cliente VN Tec/
 5. Filtros: busca textual por nome do cliente (via `profiles.full_name` com join Supabase), filtro por status
 6. Ao clicar em um briefing: exibe detalhes completos (todas as etapas)
 7. Ações: alterar status inline via select, excluir briefing com confirmação
+8. Arquivos enviados pelo cliente (imagens, vídeos, documentos) são exibidos com:
+   - Preview inline de imagem (`<img>`) para .jpg, .jpeg, .png, .webp, .gif
+   - Preview inline de vídeo (`<video controls>`) para .mp4, .webm, .mov
+   - Botão "Baixar" com ícone que abre a URL pública em nova aba
+   - Nome do arquivo exibido como texto ao lado do botão
+9. Botão "📋 Copiar briefing para IA" que gera Markdown estruturado com todas as respostas do cliente (organizado por etapa, com nome do cliente e data) e copia para a área de transferência com feedback visual "✅ Copiado!" por 2 segundos
 
 **Status disponíveis**: Novo, Em análise, Em produção, Aguardando aprovação, Aprovado, Arquivado
 
-**Arquivos envolvidos**: `src/routes/admin.tsx`, `src/lib/identification.tsx`, `src/lib/supabase.ts`, `src/lib/briefing-schema.ts`
+**Arquivos envolvidos**: `src/routes/admin.tsx`, `src/lib/identification.tsx`, `src/lib/supabase.ts`, `src/lib/briefing-schema.ts`, `src/lib/briefing-summary.tsx`
 
 > Nota: A busca por perfil foi alterada de `profile_id` para `profiles.full_name`. A consulta Supabase agora inclui `select("*, profiles(full_name)")` e a tipagem `BriefingRow` possui o campo opcional `profiles?: { full_name: string }`.
 
@@ -277,11 +283,11 @@ Form Cliente VN Tec/
 
 **Objetivo**: Simular upload de logo e materiais para o briefing.
 
-**Estado**: Implementação simulada (apenas metadados nome/tamanho). Integração real com Supabase Storage é pendente.
+**Estado**: Implementação real — arquivos são enviados ao bucket `briefing_files` no Supabase Storage seguindo o padrão `{profile_id}/{field_id}/{timestamp}-{filename}`. A URL pública é armazenada no JSONB do briefing (campo `data`).
 
 **Bucket**: `briefing_files` — configurado com políticas públicas.
 
-**Arquivos envolvidos**: `src/routes/briefing.tsx` (componente `FieldInput` tipo `file`)
+**Arquivos envolvidos**: `src/routes/briefing.tsx` (componente `FieldInput` tipo `file`), `src/routes/admin.tsx` (preview e download)
 
 ### 4.7 Exportação para IA
 
@@ -686,6 +692,10 @@ Para adicionar: editar a constante e rebuildar.
 | 23/06/2026 | Correção de segurança: placeholders do login admin não expõem mais credenciais | `placeholder="Admin VNEXUS"` → `"Digite seu nome"` e `placeholder="{0203}"` → `"Digite seu identificador"` em `admin.tsx`. Credenciais reais não são mais visíveis na interface. |
 | 23/06/2026 | Redimensionamento da logo em todas as páginas | Logo aumentada de tamanhos variados (`h-10`, `h-16`, `h-20`, `h-24`) para largura padronizada `w-44` (~176px) com `h-auto object-contain` e `draggable={false}` em todas as 7 ocorrências nos 4 arquivos. |
 | 23/06/2026 | Correção deploy Vercel — erro 404 NOT_FOUND | TanStack Start com SSR precisava do plugin `nitro/vite` para produzir output compatível com Vercel. Instalado `nitro` (`^3.0.260610-beta`), adicionado `nitro()` ao `vite.config.ts`, criado `vercel.json` com `framework: null` e output `.vercel/output/static`, adicionado script `start` (`node .output/server/index.mjs`). |
+| 23/06/2026 | Upload real de arquivos para Supabase Storage | `briefing.tsx`: file inputs agora enviam arquivos ao bucket `briefing_files` com path `{profile_id}/{field_id}/{timestamp}-{filename}` e armazenam URL pública no JSONB |
+| 23/06/2026 | Download e preview de arquivos no admin | `admin.tsx`: campos do tipo `file` renderizam preview inline de imagens/vídeos + botão "Baixar" com ícone |
+| 23/06/2026 | Botão "Copiar briefing para IA" no admin | `admin.tsx`: gera Markdown estruturado com `buildBriefing()` aprimorada, copia para clipboard com feedback visual |
+| 23/06/2026 | `buildBriefing()` aprimorada | `briefing-summary.tsx`: suporte a `clientName`/`date`, etapas numeradas, "Não informado" para campos vazios, URLs de arquivos |
 
 ---
 
@@ -693,7 +703,6 @@ Para adicionar: editar a constante e rebuildar.
 
 ### 11.1 Alta Prioridade
 
-- [ ] Upload real de arquivos para Supabase Storage (logo + materiais)
 - [ ] Adicionar sanitização de saída contra XSS
 - [ ] Criar testes automatizados (Vitest + Playwright)
 - [ ] Proteger rota /admin com middleware server-side
@@ -807,6 +816,10 @@ Para adicionar: editar a constante e rebuildar.
 - **Segurança: placeholders do login admin sanitizados**: `placeholder="Admin VNEXUS"` removido (substituído por `"Digite seu nome"`) e `placeholder="{0203}"` removido (substituído por `"Digite seu identificador"`) em `admin.tsx` — as credenciais reais não ficam mais expostas visualmente na interface de login.
 - **Redimensionamento da logo**: Todas as 7 ocorrências da logo nos 4 arquivos (`index.tsx`, `admin.tsx`, `briefing.tsx`, `briefing-summary.tsx`) tiveram suas classes Tailwind alteradas de altura fixa (`h-10`, `h-16`, `h-20`, `h-24`) para largura padronizada `w-44 h-auto object-contain` com `draggable={false}`.
 - **23/06/2026 — Correção deploy Vercel (404 NOT_FOUND)**: Instalação do pacote `nitro` (v3.0.260610-beta), adição do plugin `nitro()` no `vite.config.ts`, criação do `vercel.json` na raiz com `framework: null`, `outputDirectory: .vercel/output/static` e `buildCommand: npm run build`. Adicionado script `start` no `package.json` (`node .output/server/index.mjs`). Build verificado localmente — client, SSR e Nitro compilam sem erros.
+- **23/06/2026 — Upload real de arquivos para Supabase Storage**: Em `briefing.tsx`, o componente `FieldInput` do tipo `file` agora envia arquivos para o bucket `briefing_files` seguindo o padrão `{profile_id}/{field_id}/{timestamp}-{filename}`. A URL pública é armazenada no JSONB do briefing. O valor do campo foi alterado de `{name, size}[]` para `string[]` (URLs).
+- **23/06/2026 — Download e preview de arquivos no admin**: Em `admin.tsx`, o `BriefingDetail` identifica campos do tipo `file` e renderiza preview inline de imagens (`<img>`) e vídeos (`<video controls>`), com botão "Baixar" (ícone `Download` do lucide-react) que abre a URL pública em nova aba.
+- **23/06/2026 — Botão "Copiar briefing para IA" no admin**: Em `admin.tsx`, adicionado botão destacado "📋 Copiar briefing para IA" que gera Markdown estruturado (via `buildBriefing()` aprimorada) com nome do cliente, data de envio, etapas numeradas, URLs de arquivos e "Não informado" para campos vazios. Copia para clipboard com feedback visual "✅ Copiado!" por 2 segundos.
+- **23/06/2026 — `buildBriefing()` aprimorada**: Em `briefing-summary.tsx`, a função `buildBriefing()` agora aceita parâmetros opcionais `clientName` e `date`, inclui numeração de etapas (`## Etapa X — Nome`), exibe "Não informado" para campos vazios, e mostra URLs de arquivos no lugar dos nomes.
 
 ### Instruções para Próximas Intervenções
 
@@ -850,10 +863,12 @@ Para adicionar: editar a constante e rebuildar.
    - Ver todos os briefings recebidos (ordenados por data)
    - Filtrar briefings por status
    - Buscar por ID do perfil
-   - Clicar em um briefing para ver todos os detalhes
-   - Alterar status do briefing (ex: "Novo" → "Em análise")
-   - Excluir briefings (com confirmação)
-   - Encaminhar o briefing para IA (cópia em Markdown)
+    - Clicar em um briefing para ver todos os detalhes
+    - Visualizar preview de imagens e vídeos enviados pelo cliente
+    - Baixar arquivos do briefing (logo, materiais, etc.)
+    - Alterar status do briefing (ex: "Novo" → "Em análise")
+    - Excluir briefings (com confirmação)
+    - Clicar "📋 Copiar briefing para IA" para copiar Markdown estruturado com todas as respostas
 
 > Caso o login admin falhe, use o botão **"Limpar cache"** e tente novamente.
 
@@ -981,7 +996,7 @@ As seguintes variáveis DEVEM estar configuradas no painel da Vercel (Settings �
 |---|---|
 | Bucket `briefing_files` | ✅ Criado |
 | Políticas públicas | ✅ Configuradas |
-| Upload real | ❌ Pendente (apenas simulado) |
+| Upload real | ✅ Implementado (Supabase Storage com URLs públicas) |
 
 ### Rotas
 
@@ -1005,6 +1020,8 @@ As seguintes variáveis DEVEM estar configuradas no painel da Vercel (Settings �
 | Mudança de status inline | ✅ |
 | Exclusão | ✅ |
 | Detalhes do briefing | ✅ |
+| Download/preview de arquivos | ✅ Inline: imagens (`<img>`), vídeos (`<video>`), botão "Baixar" |
+| Copiar briefing para IA | ✅ Markdown estruturado com clipboard (`navigator.clipboard.writeText`) + feedback visual |
 | Campo de busca com tema dark | ✅ `bg-white/5 text-white placeholder:text-white/40` |
 
 ### Briefing
@@ -1015,7 +1032,7 @@ As seguintes variáveis DEVEM estar configuradas no painel da Vercel (Settings �
 | Autosave debounce 1.5s | ✅ |
 | Recuperação automática | ✅ |
 | Validação campos obrigatórios | ✅ |
-| Upload simulado | ✅ |
+| Upload real (Supabase Storage) | ✅ |
 | Submissão | ✅ |
 | Tela de agradecimento | ✅ |
 | Briefing concluído detectado | ✅ Tela "Você já concluiu" + opção novo briefing |

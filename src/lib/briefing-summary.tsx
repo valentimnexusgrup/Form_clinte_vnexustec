@@ -2,7 +2,7 @@ import { useMemo, useState } from "react";
 import logoSrc from "@/assets/vnexus-logo.webp";
 import { steps } from "@/lib/briefing-schema";
 
-export type Value = string | string[] | { name: string; size: number }[];
+export type Value = string | string[];
 export type FormState = Record<string, Value>;
 
 export type SubmissionStatus =
@@ -60,14 +60,17 @@ export function updateSubmissionStatus(id: string, status: SubmissionStatus) {
   return list;
 }
 
-export function buildBriefing(data: FormState): string {
+export function buildBriefing(
+  data: FormState,
+  options?: { clientName?: string; date?: string },
+): string {
   const get = (id: string) => {
     const v = data[id];
-    if (!v) return "—";
+    if (!v) return "Não informado";
     if (Array.isArray(v)) {
-      if (v.length === 0) return "—";
+      if (v.length === 0) return "Não informado";
       if (typeof v[0] === "string") return (v as string[]).join(", ");
-      return (v as { name: string }[]).map((f) => f.name).join(", ");
+      return (v as unknown as { name: string }[]).map((f) => f.name).join(", ");
     }
     return String(v);
   };
@@ -75,10 +78,14 @@ export function buildBriefing(data: FormState): string {
   const lines: string[] = [];
   lines.push("# BRIEFING DE LANDING PAGE — VNEXUS TEC");
   lines.push("");
-  lines.push(`> Gerado em ${new Date().toLocaleString("pt-BR")}`);
+  if (options?.clientName) lines.push(`**Cliente:** ${options.clientName}`);
+  if (options?.date)
+    lines.push(`**Data de envio:** ${new Date(options.date).toLocaleString("pt-BR")}`);
+  if (options?.clientName || options?.date) lines.push("");
+  lines.push("---");
   lines.push("");
-  for (const step of steps) {
-    lines.push(`## ${step.title}`);
+  for (const [index, step] of steps.entries()) {
+    lines.push(`## Etapa ${index + 1} — ${step.title}`);
     for (const f of step.fields) {
       lines.push(`**${f.label}:** ${get(f.id)}`);
     }
@@ -126,7 +133,12 @@ export function Summary({
     <div className="min-h-screen px-4 py-10 sm:py-16">
       <div className="mx-auto max-w-4xl">
         <header className="mb-10 text-center">
-          <img src={logoSrc} alt="VNEXUS TEC" className="mx-auto w-72 h-auto object-contain" draggable={false} />
+          <img
+            src={logoSrc}
+            alt="VNEXUS TEC"
+            className="mx-auto w-72 h-auto object-contain"
+            draggable={false}
+          />
           <div className="mt-6 inline-flex items-center gap-2 rounded-full border border-accent/40 bg-accent/10 px-4 py-1.5 text-xs font-semibold uppercase tracking-widest text-accent">
             ✓ {title}
           </div>
@@ -166,7 +178,7 @@ export function Summary({
                       ? "—"
                       : typeof v[0] === "string"
                         ? (v as string[]).join(", ")
-                        : (v as { name: string }[]).map((x) => x.name).join(", ")
+                        : (v as unknown as { name: string }[]).map((x) => x.name).join(", ")
                     : (v as string) || "—";
                   return (
                     <div

@@ -108,12 +108,12 @@ function LandingPage() {
   return (
     <div className="min-h-screen px-4 py-10 sm:py-16">
       <div className="mx-auto flex max-w-lg flex-col items-center text-center">
-          <img
-            src={logoSrc}
-            alt="VNEXUS TEC"
-            className="w-80 h-auto object-contain drop-shadow-[0_0_30px_rgba(15,76,255,0.35)]"
-            draggable={false}
-          />
+        <img
+          src={logoSrc}
+          alt="VNEXUS TEC"
+          className="w-80 h-auto object-contain drop-shadow-[0_0_30px_rgba(15,76,255,0.35)]"
+          draggable={false}
+        />
         <p className="mt-6 text-xs font-semibold uppercase tracking-[0.3em] text-gradient-gold">
           Briefing · Landing Page
         </p>
@@ -126,7 +126,10 @@ function LandingPage() {
 
         <form onSubmit={handleSubmit} className="mt-10 w-full space-y-5">
           <div className="text-left">
-            <label htmlFor="full-name" className="mb-1.5 block text-xs font-semibold uppercase tracking-wider text-muted-foreground">
+            <label
+              htmlFor="full-name"
+              className="mb-1.5 block text-xs font-semibold uppercase tracking-wider text-muted-foreground"
+            >
               Nome Completo
             </label>
             <input
@@ -142,7 +145,10 @@ function LandingPage() {
           </div>
 
           <div className="text-left">
-            <label htmlFor="phone-last4" className="mb-1.5 block text-xs font-semibold uppercase tracking-wider text-muted-foreground">
+            <label
+              htmlFor="phone-last4"
+              className="mb-1.5 block text-xs font-semibold uppercase tracking-wider text-muted-foreground"
+            >
               Últimos 4 dígitos do WhatsApp
             </label>
             <input

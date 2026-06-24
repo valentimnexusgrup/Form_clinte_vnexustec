@@ -1,9 +1,11 @@
 import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
 import logoSrc from "@/assets/vnexus-logo.webp";
 import { useIdentification } from "@/lib/identification";
-import { useEffect, useState } from "react";
+import { useEffect, useState, useCallback } from "react";
 import { supabase } from "@/lib/supabase";
 import { steps } from "@/lib/briefing-schema";
+import { buildBriefing, type FormState } from "@/lib/briefing-summary";
+import { Download } from "lucide-react";
 
 export const Route = createFileRoute("/admin")({
   head: () => ({
@@ -180,7 +182,10 @@ function AdminPage() {
 
           <form onSubmit={handleAdminLogin} className="mt-8 w-full space-y-4">
             <div className="text-left">
-              <label htmlFor="admin-name" className="mb-1.5 block text-xs font-semibold uppercase tracking-wider text-muted-foreground">
+              <label
+                htmlFor="admin-name"
+                className="mb-1.5 block text-xs font-semibold uppercase tracking-wider text-muted-foreground"
+              >
                 Nome
               </label>
               <input
@@ -195,7 +200,10 @@ function AdminPage() {
               />
             </div>
             <div className="text-left">
-              <label htmlFor="admin-identifier" className="mb-1.5 block text-xs font-semibold uppercase tracking-wider text-muted-foreground">
+              <label
+                htmlFor="admin-identifier"
+                className="mb-1.5 block text-xs font-semibold uppercase tracking-wider text-muted-foreground"
+              >
                 Identificador
               </label>
               <input
@@ -432,6 +440,67 @@ function BriefingDetail({
   onBack: () => void;
 }) {
   const data = briefing.data as Record<string, string | string[]>;
+  const [copied, setCopied] = useState(false);
+
+  const fileFieldIds = new Set(
+    steps.flatMap((s) => s.fields.filter((f) => f.type === "file").map((f) => f.id)),
+  );
+
+  const handleCopyIA = useCallback(async () => {
+    const markdown = buildBriefing(data as FormState, {
+      clientName: briefing.profiles?.full_name || undefined,
+      date: briefing.created_at,
+    });
+    await navigator.clipboard.writeText(markdown);
+    setCopied(true);
+    setTimeout(() => setCopied(false), 2000);
+  }, [data, briefing.profiles?.full_name, briefing.created_at]);
+
+  const isImageUrl = (url: string) => /\.(jpg|jpeg|png|webp|gif)(\?.*)?$/i.test(url);
+  const isVideoUrl = (url: string) => /\.(mp4|webm|mov)(\?.*)?$/i.test(url);
+  const getFileName = (url: string) => url.split("/").pop() || "arquivo";
+
+  const renderFileValue = (val: string | string[]) => {
+    const urls = Array.isArray(val) ? val : [val];
+    return (
+      <div className="flex flex-col gap-2">
+        {urls.map((url, i) => {
+          if (!url || typeof url !== "string") return null;
+          return (
+            <div
+              key={i}
+              className="flex flex-col gap-1.5 rounded-lg border border-border/40 bg-muted/20 p-2"
+            >
+              {isImageUrl(url) ? (
+                <img
+                  src={url}
+                  alt={getFileName(url)}
+                  className="max-h-48 w-full rounded object-contain"
+                  loading="lazy"
+                />
+              ) : isVideoUrl(url) ? (
+                <video controls className="max-h-48 w-full rounded" preload="metadata">
+                  <source src={url} />
+                </video>
+              ) : null}
+              <div className="flex items-center gap-2">
+                <span className="truncate text-xs text-muted-foreground">{getFileName(url)}</span>
+                <a
+                  href={url}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="inline-flex items-center gap-1 rounded bg-primary/20 px-2 py-1 text-[10px] font-semibold uppercase tracking-wider text-primary transition hover:bg-primary/30"
+                >
+                  <Download className="h-3 w-3" />
+                  Baixar
+                </a>
+              </div>
+            </div>
+          );
+        })}
+      </div>
+    );
+  };
 
   return (
     <div className="sticky top-10 rounded-2xl border border-border/60 bg-gradient-surface p-6 shadow-glow">
@@ -472,6 +541,13 @@ function BriefingDetail({
         <p>Atualizado em: {new Date(briefing.updated_at).toLocaleString("pt-BR")}</p>
       </div>
 
+      <button
+        onClick={handleCopyIA}
+        className="mb-5 w-full rounded-lg bg-gradient-gold px-4 py-3 text-sm font-bold uppercase tracking-wider text-graphite shadow-gold transition hover:scale-[1.02]"
+      >
+        {copied ? "✅ Copiado!" : "📋 Copiar briefing para IA"}
+      </button>
+
       <div className="space-y-4">
         {steps.map((step) => {
           const stepData = step.fields
@@ -483,9 +559,13 @@ function BriefingDetail({
                   <p className="mb-1 text-[10px] font-semibold uppercase tracking-widest text-muted-foreground">
                     {field.label}
                   </p>
-                  <p className="whitespace-pre-wrap text-sm leading-relaxed">
-                    {Array.isArray(val) ? val.join(", ") : val || "—"}
-                  </p>
+                  {fileFieldIds.has(field.id) ? (
+                    renderFileValue(val)
+                  ) : (
+                    <p className="whitespace-pre-wrap text-sm leading-relaxed">
+                      {Array.isArray(val) ? val.join(", ") : val || "—"}
+                    </p>
+                  )}
                 </div>
               );
             })

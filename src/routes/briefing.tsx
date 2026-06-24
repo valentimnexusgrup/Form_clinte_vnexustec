@@ -19,7 +19,7 @@ export const Route = createFileRoute("/briefing")({
   component: BriefingPage,
 });
 
-type Value = string | string[] | { name: string; size: number }[];
+type Value = string | string[];
 type FormState = Record<string, Value>;
 
 const DEBOUNCE_MS = 1500;
@@ -395,6 +395,7 @@ function BriefingPage() {
                 other={other[field.id] || ""}
                 onChange={(v) => update(field.id, v)}
                 onOtherChange={(v) => setOther((o) => ({ ...o, [field.id]: v }))}
+                profileId={profile?.id || ""}
               />
             ))}
           </div>
@@ -486,13 +487,16 @@ function FieldInput({
   other,
   onChange,
   onOtherChange,
+  profileId,
 }: {
   field: Field;
   value: Value | undefined;
   other: string;
   onChange: (v: Value) => void;
   onOtherChange: (v: string) => void;
+  profileId: string;
 }) {
+  const [uploading, setUploading] = useState(false);
   const labelEl = (
     <label className="mb-2 flex items-baseline justify-between gap-3">
       <span className="text-sm font-semibold text-foreground">
@@ -630,7 +634,36 @@ function FieldInput({
       );
     }
     case "file": {
-      const files = Array.isArray(value) ? (value as { name: string; size: number }[]) : [];
+      const urls = Array.isArray(value) ? (value as string[]) : [];
+
+      const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+        const files = Array.from(e.target.files || []);
+        if (files.length === 0 || !profileId) return;
+
+        setUploading(true);
+        try {
+          const uploadedUrls: string[] = [];
+          for (const file of files) {
+            try {
+              const filePath = `${profileId}/${field.id}/${Date.now()}-${file.name}`;
+              await supabase.storage.from("briefing_files").upload(filePath, file);
+              const {
+                data: { publicUrl },
+              } = supabase.storage.from("briefing_files").getPublicUrl(filePath);
+              uploadedUrls.push(publicUrl);
+            } catch (err) {
+              console.error("[BRIEFING] upload error for file:", file.name, err);
+            }
+          }
+          if (uploadedUrls.length > 0) {
+            onChange([...urls, ...uploadedUrls]);
+          }
+        } finally {
+          setUploading(false);
+        }
+        e.target.value = "";
+      };
+
       return (
         <div>
           {labelEl}
@@ -648,39 +681,44 @@ function FieldInput({
                 strokeLinejoin="round"
               />
             </svg>
-            <span className="text-sm font-medium text-foreground">Clique para enviar arquivos</span>
+            <span className="text-sm font-medium text-foreground">
+              {uploading ? "Enviando..." : "Clique para enviar arquivos"}
+            </span>
             <span className="text-xs text-muted-foreground">ou arraste e solte aqui</span>
             <input
               type="file"
               multiple
               className="hidden"
-              onChange={(e) => {
-                const list = Array.from(e.target.files || []).map((f) => ({
-                  name: f.name,
-                  size: f.size,
-                }));
-                onChange([...files, ...list]);
-              }}
+              disabled={uploading}
+              onChange={handleFileUpload}
             />
           </label>
-          {files.length > 0 && (
+          {urls.length > 0 && (
             <ul className="mt-3 space-y-1.5">
-              {files.map((f, i) => (
+              {urls.map((url, i) => (
                 <li
                   key={i}
-                  className="flex items-center justify-between rounded-md border border-border bg-input/30 px-3 py-2 text-xs"
+                  className="flex items-center justify-between gap-2 rounded-md border border-border bg-input/30 px-3 py-2 text-xs"
                 >
-                  <span className="truncate font-medium text-foreground">{f.name}</span>
+                  <span className="truncate font-medium text-foreground">
+                    {url.split("/").pop()}
+                  </span>
                   <button
                     type="button"
-                    onClick={() => onChange(files.filter((_, idx) => idx !== i))}
-                    className="text-muted-foreground hover:text-destructive"
+                    onClick={() => onChange(urls.filter((_, idx) => idx !== i))}
+                    className="shrink-0 text-muted-foreground hover:text-destructive"
                   >
                     Remover
                   </button>
                 </li>
               ))}
             </ul>
+          )}
+          {uploading && (
+            <div className="mt-2 flex items-center gap-2 text-xs text-muted-foreground">
+              <span className="h-2 w-2 animate-pulse rounded-full bg-accent" />
+              Enviando arquivos...
+            </div>
           )}
           {hintEl}
         </div>
