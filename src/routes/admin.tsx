@@ -74,12 +74,6 @@ function AdminPage() {
     : false;
 
   useEffect(() => {
-    if (!authLoading && profile && !isAdmin) {
-      navigate({ to: "/" });
-    }
-  }, [authLoading, profile, isAdmin, navigate]);
-
-  useEffect(() => {
     const fetchData = async () => {
       if (!isAdmin) return;
       setLoading(true);
