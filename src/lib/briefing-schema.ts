@@ -641,7 +641,36 @@ export function buildServiceScoresFromData(data?: Record<string, unknown>): Reco
   return scores;
 }
 
-export function shouldAskTieBreaker(data?: { service_scores?: Record<string, number> }): boolean {
+/**
+ * Verifica se todas as perguntas de diagnóstico foram respondidas.
+ * Usa os 5 campos obrigatórios definidos em diagnosticFields.
+ */
+function isDiagnosticComplete(data?: Record<string, unknown>): boolean {
+  if (!data) return false;
+  
+  const requiredDiagnosticIds = [
+    "objetivo_principal",
+    "presenca_digital_atual",
+    "acao_esperada",
+    "processos_internos",
+    "principal_dor",
+  ];
+  
+  return requiredDiagnosticIds.every((fieldId) => {
+    const value = data[fieldId];
+    // Aceita string não-vazia, array com elementos, e valores não-nullish
+    if (typeof value === "string") return value.trim().length > 0;
+    if (Array.isArray(value)) return value.length > 0;
+    return !!value;
+  });
+}
+
+export function shouldAskTieBreaker(data?: { service_scores?: Record<string, number> } & Record<string, unknown>): boolean {
+  // Só considera empate se o diagnóstico estiver 100% completo
+  if (!isDiagnosticComplete(data)) {
+    return false;
+  }
+  
   const scores = data?.service_scores ?? {};
   const entries = Object.entries(scores)
     .filter(([, value]) => typeof value === "number")

@@ -40,14 +40,50 @@ describe("briefing schema", () => {
     assert.equal(inferred, "landing-page");
   });
 
-  it("asks a tie-breaker only when the top scores are close", () => {
-    const tiedScores = {
-      "central-de-links": 3,
-      "landing-page": 3,
-      "site-institucional": 2,
-      sistema: 1,
+  it("asks a tie-breaker only when the top scores are close AND diagnostic is complete", () => {
+    // Scores tied, but diagnostic INCOMPLETE → should return false
+    const tiedScoresIncompleteDiagnostic = {
+      objetivo_principal: "Vender um produto",
+      // Missing: presenca_digital_atual, acao_esperada, processos_internos, principal_dor
+      service_scores: {
+        "central-de-links": 3,
+        "landing-page": 3,
+        "site-institucional": 2,
+        sistema: 1,
+      },
     };
+    assert.equal(shouldAskTieBreaker(tiedScoresIncompleteDiagnostic), false);
 
-    assert.equal(shouldAskTieBreaker({ service_scores: tiedScores }), true);
+    // Scores tied AND diagnostic COMPLETE → should return true
+    const tiedScoresCompleteDiagnostic = {
+      objetivo_principal: "Vender um produto",
+      presenca_digital_atual: "Não tenho nada",
+      acao_esperada: "Fechar a venda na hora",
+      processos_internos: "Venda/cliente",
+      principal_dor: "Falta de leads qualificados",
+      service_scores: {
+        "central-de-links": 3,
+        "landing-page": 3,
+        "site-institucional": 2,
+        sistema: 1,
+      },
+    };
+    assert.equal(shouldAskTieBreaker(tiedScoresCompleteDiagnostic), true);
+
+    // Scores NOT tied → should return false even with complete diagnostic
+    const untiedScoresCompleteDiagnostic = {
+      objetivo_principal: "Vender um produto",
+      presenca_digital_atual: "Não tenho nada",
+      acao_esperada: "Fechar a venda",
+      processos_internos: "Venda/cliente",
+      principal_dor: "Falta leads",
+      service_scores: {
+        "central-de-links": 1,
+        "landing-page": 8,
+        "site-institucional": 2,
+        sistema: 1,
+      },
+    };
+    assert.equal(shouldAskTieBreaker(untiedScoresCompleteDiagnostic), false);
   });
 });

@@ -545,7 +545,7 @@ npm run dev
 
 ## 🔧 ALTERAÇÕES RECENTES (Sprint Atual)
 
-### ✅ Mudança Principal: Remoção do Seletor Manual de Serviço
+### ✅ Mudança 1: Remoção do Seletor Manual de Serviço
 
 **Data**: 01/09/2026  
 **Responsável**: Assistant (GitHub Copilot)  
@@ -586,24 +586,70 @@ const workflow = useMemo(() =>
 - Mantém compatibilidade com dados salvos anteriormente
 - Testes passam 100% ✅
 
+---
+
+### ✅ Mudança 2: Estabilidade do Workflow (Diagnóstico Completo)
+
+**Data**: 01/09/2026  
+**Responsável**: Assistant (GitHub Copilot)  
+**Status**: ✅ Concluída e validada
+
+#### Problema
+A função `shouldAskTieBreaker` decidia sobre o desempate de serviços **parcialmente** durante o preenchimento das perguntas de diagnóstico. Isso fazia com que:
+- A contagem de etapas ("Etapa X de Y") mudasse no meio do preenchimento
+- O `stepIndex` apontasse para etapas erradas
+- O workflow expandisse/contraísse dinamicamente
+
+#### Solução
+Implementar uma verificação de **completude do diagnóstico** antes de avaliar o empate:
+
+```typescript
+// ✅ NOVO: Função auxiliar que verifica 100% de completude
+function isDiagnosticComplete(data?: Record<string, unknown>): boolean {
+  if (!data) return false;
+  
+  const requiredDiagnosticIds = [
+    "objetivo_principal",
+    "presenca_digital_atual",
+    "acao_esperada",
+    "processos_internos",
+    "principal_dor",
+  ];
+  
+  return requiredDiagnosticIds.every((fieldId) => {
+    const value = data[fieldId];
+    if (typeof value === "string") return value.trim().length > 0;
+    if (Array.isArray(value)) return value.length > 0;
+    return !!value;
+  });
+}
+
+// ✅ MODIFICADO: shouldAskTieBreaker agora checa completude
+export function shouldAskTieBreaker(data?: ...): boolean {
+  // Só considera empate se o diagnóstico estiver 100% completo
+  if (!isDiagnosticComplete(data)) {
+    return false;
+  }
+  
+  // ... resto da lógica original ...
+}
+```
+
+#### Resultado
+- ✅ Workflow gerado uma vez e fica **estável** durante preenchimento
+- ✅ Contagem de etapas não muda
+- ✅ `stepIndex` sempre aponta para a etapa correta
+- ✅ Desempate só acontece APÓS diagnóstico 100% completo
+
 #### Validação
 
 ```bash
 ✔ TypeScript compilation: 0 errors
 ✔ Test suite: 3/3 tests passed
-  - exposes the four service flows ✓
-  - infers service type and scores ✓
-  - asks tie-breaker when scores close ✓
+  ✔ exposes the four service flows (10.7ms)
+  ✔ infers service type and scores from diagnosis answers (0.9ms)
+  ✔ asks a tie-breaker only when diagnostic is complete AND scores close (0.7ms)
 ```
-
-#### Impacto
-
-| Componente | Antes | Depois | Status |
-|---|---|---|---|
-| Rotas do formulário | 7 etapas + seletor | 7 etapas (diagnóstico inclusso) | ✅ |
-| Tempo de preenchimento | ~15 min + decisão | ~10-12 min | ✅ Reduzido |
-| Taxa de abandono | Potencial em seletor | Minimizado | ✅ Melhorado |
-| Compatibilidade anterior | N/A | Mantida | ✅ |
 
 ---
 
