@@ -600,6 +600,18 @@ A função `shouldAskTieBreaker` decidia sobre o desempate de serviços **parcia
 - O `stepIndex` apontasse para etapas erradas
 - O workflow expandisse/contraísse dinamicamente
 
+### ✅ Mudança 3: Ajuste da Copy da Tela Inicial
+
+**Data**: 01/09/2026  
+**Responsável**: Assistant (GitHub Copilot)  
+**Status**: ✅ Concluída
+
+#### Problema
+A tela de entrada ainda usava textos que sugeriam uma solução exclusiva para Landing Page, mesmo após a mudança para diagnóstico genérico e inferência automática de serviços.
+
+#### Solução
+Ajustou o headline, o metadado da página e a descrição para refletir um diagnóstico inicial aberto e consultivo, sem reforçar exclusividade ou foco único em Landing Page.
+
 #### Solução
 Implementar uma verificação de **completude do diagnóstico** antes de avaliar o empate:
 

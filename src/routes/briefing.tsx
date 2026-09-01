@@ -15,11 +15,11 @@ import { supabase } from "@/lib/supabase";
 export const Route = createFileRoute("/briefing")({
   head: () => ({
     meta: [
-      { title: "Briefing de Landing Page · VNEXUS TEC" },
+      { title: "Diagnóstico e briefing · VNEXUS TEC" },
       {
         name: "description",
         content:
-          "Formulário inteligente para coleta de briefing de Landing Pages de alta conversão.",
+          "Formulário inteligente para diagnosticar a melhor solução e iniciar o briefing do projeto.",
       },
     ],
   }),

@@ -66,18 +66,18 @@ export const Route = createRootRouteWithContext<{ queryClient: QueryClient }>()(
     meta: [
       { charSet: "utf-8" },
       { name: "viewport", content: "width=device-width, initial-scale=1" },
-      { title: "Briefing de Landing Page · VNEXUS TEC" },
+      { title: "Diagnóstico e briefing · VNEXUS TEC" },
       {
         name: "description",
         content:
-          "Formulário inteligente para coleta de briefing de Landing Pages de alta conversão.",
+          "Formulário inteligente para diagnosticar a melhor solução e iniciar o briefing do projeto.",
       },
       { name: "author", content: "VNEXUS TEC" },
-      { property: "og:title", content: "Briefing de Landing Page · VNEXUS TEC" },
+      { property: "og:title", content: "Diagnóstico e briefing · VNEXUS TEC" },
       {
         property: "og:description",
         content:
-          "Formulário inteligente para coleta de briefing de Landing Pages de alta conversão.",
+          "Formulário inteligente para diagnosticar a melhor solução e iniciar o briefing do projeto.",
       },
       { property: "og:type", content: "website" },
       { name: "twitter:card", content: "summary" },

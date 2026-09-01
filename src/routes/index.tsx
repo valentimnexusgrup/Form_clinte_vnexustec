@@ -7,11 +7,11 @@ import { supabase } from "@/lib/supabase";
 export const Route = createFileRoute("/")({
   head: () => ({
     meta: [
-      { title: "Briefing de Landing Page · VNEXUS TEC" },
+      { title: "Diagnóstico inicial · VNEXUS TEC" },
       {
         name: "description",
         content:
-          "Formulário inteligente para coleta de briefing de Landing Pages de alta conversão.",
+          "Formulário inteligente para diagnosticar a melhor solução para seu projeto e iniciar o briefing.",
       },
     ],
   }),
@@ -115,13 +115,13 @@ function LandingPage() {
           draggable={false}
         />
         <p className="mt-6 text-xs font-semibold uppercase tracking-[0.3em] text-gradient-gold">
-          Briefing · Landing Page
+          Diagnóstico inicial
         </p>
         <h1 className="mt-4 text-3xl font-bold leading-tight sm:text-5xl">
-          Vamos criar sua <span className="text-gradient-gold">Landing Page</span>
+          Vamos entender seu <span className="text-gradient-gold">projeto</span>
         </h1>
         <p className="mt-4 max-w-md text-sm text-muted-foreground sm:text-base">
-          Informe seus dados para iniciar ou continuar seu briefing.
+          Informe seus dados para iniciar o diagnóstico e receber a melhor solução para o seu caso.
         </p>
 
         <form onSubmit={handleSubmit} className="mt-10 w-full space-y-5">

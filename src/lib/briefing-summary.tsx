@@ -120,7 +120,7 @@ export function buildBriefing(
 export function Summary({
   data,
   title = "Briefing pronto",
-  subtitle = "Conteúdo formatado para uso por IA na criação da Landing Page.",
+  subtitle = "Conteúdo formatado para uso por IA na criação da solução recomendada.",
   actions,
 }: {
   data: FormState;

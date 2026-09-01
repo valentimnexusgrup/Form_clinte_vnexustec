@@ -348,7 +348,7 @@ function AdminPage() {
                       const serviceType = getServiceTypeFromData((b.data as Record<string, unknown>) ?? {});
                       const serviceLabel =
                         SERVICE_OPTIONS.find((option) => option.id === serviceType)?.label ||
-                        "Landing Page";
+                        "Serviço identificado";
 
                       return (
                         <tr
@@ -573,7 +573,7 @@ function BriefingDetail({
       <div className="mb-4 rounded-lg border border-border/40 bg-muted/20 p-3">
         <p className="text-xs font-semibold text-muted-foreground">Tipo de serviço</p>
         <p className="text-sm font-medium">
-          {SERVICE_OPTIONS.find((option) => option.id === serviceType)?.label || "Landing Page"}
+          {SERVICE_OPTIONS.find((option) => option.id === serviceType)?.label || "Serviço identificado"}
         </p>
       </div>
 
