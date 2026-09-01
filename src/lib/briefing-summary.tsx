@@ -206,7 +206,7 @@ export function Summary({
                       className="flex flex-col gap-0.5 border-b border-border/40 pb-2 last:border-0"
                     >
                       <dt className="text-xs font-medium text-muted-foreground">{f.label}</dt>
-                      <dd className="break-words text-foreground">{display}</dd>
+                      <dd className="wrap-break-word text-foreground">{display}</dd>
                     </div>
                   );
                 })}
@@ -224,7 +224,7 @@ export function Summary({
               {copied ? "✓ copiado" : "copiar"}
             </button>
           </div>
-          <pre className="max-h-[480px] overflow-auto p-4 text-xs leading-relaxed text-muted-foreground">
+          <pre className="max-h-120 overflow-auto p-4 text-xs leading-relaxed text-muted-foreground">
             {briefing}
           </pre>
         </div>
