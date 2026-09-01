@@ -1,6 +1,7 @@
 # Pacote de Favicon — VNEXUS TEC
 
 ## O que tem aqui
+
 - `favicon.ico` — ícone multi-tamanho (16/32/48px) para navegadores antigos
 - `favicon-16x16.png`, `favicon-32x32.png`, `favicon-96x96.png` — ícones para abas modernas
 - `apple-touch-icon.png` (180x180) — ícone ao salvar em tela de iOS
@@ -8,6 +9,7 @@
 - `site.webmanifest` — manifesto para PWA/Android
 
 ## Passo 1 — Copiar os arquivos
+
 Copie TODOS os arquivos deste pacote (exceto este INSTRUCOES.md) para a pasta `public/` do projeto (raiz do projeto TanStack Start), assim:
 
 ```
@@ -22,6 +24,7 @@ public/site.webmanifest
 ```
 
 ## Passo 2 — Referenciar no root da aplicação
+
 No arquivo de rota raiz (`__root.tsx` ou `root.tsx`, onde fica `createRootRoute`), adicione estes links dentro da propriedade `head`:
 
 ```tsx
@@ -47,6 +50,7 @@ export const Route = createRootRoute({
 ```
 
 ## Passo 3 — Testar
+
 1. Rodar o projeto localmente (`npm run dev` ou equivalente).
 2. Abrir a aba do navegador e verificar se o ícone aparece.
 3. Se não atualizar: hard refresh (Ctrl+Shift+R) — o navegador cacheia favicon de forma agressiva.

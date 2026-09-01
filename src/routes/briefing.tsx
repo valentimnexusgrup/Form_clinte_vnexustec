@@ -1,13 +1,13 @@
-import { useEffect, useMemo, useState, useCallback, useRef } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
 import logoSrc from "@/assets/vnexus-logo.webp";
 import {
-  SERVICE_OPTIONS,
-  buildDiagnosticWorkflow,
-  buildServiceScoresFromData,
-  getServiceTypeFromData,
   type Field,
   type ServiceType,
+  buildDiagnosticWorkflow,
+  getServiceTypeFromData,
+  NEW_FORM_VERSION,
+  SERVICE_OPTIONS,
 } from "@/lib/briefing-schema";
 import { useIdentification } from "@/lib/identification";
 import { supabase } from "@/lib/supabase";
@@ -37,7 +37,7 @@ function BriefingPage() {
 
   const [hydrated, setHydrated] = useState(false);
   const [stepIndex, setStepIndex] = useState(0);
-  const [data, setData] = useState<FormState>({});
+  const [data, setData] = useState<FormState>({ form_version: NEW_FORM_VERSION });
   const [other, setOther] = useState<Record<string, string>>({});
   const [submitted, setSubmitted] = useState(false);
   const [briefingId, setBriefingId] = useState<string | null>(null);
@@ -70,14 +70,16 @@ function BriefingPage() {
       }
 
       if (!list || list.length === 0) {
+        setData({ form_version: NEW_FORM_VERSION });
         setHydrated(true);
         return;
       }
 
       const existing = list[0];
       const recoveredData = (existing.data as FormState) || {};
+      const isLegacyFlow = recoveredData.form_version !== NEW_FORM_VERSION;
 
-      if (existing.completed) {
+      if (existing.completed && !isLegacyFlow) {
         setAlreadyCompleted(true);
         setBriefingId(existing.id);
         setData(recoveredData);
@@ -86,25 +88,30 @@ function BriefingPage() {
         return;
       }
 
+      if (isLegacyFlow) {
+        setBriefingId(existing.id);
+        setStepIndex(0);
+        setData({ form_version: NEW_FORM_VERSION });
+        setOther({});
+        setHydrated(true);
+        return;
+      }
+
       setBriefingId(existing.id);
-      setStepIndex(existing.current_step);
+      setStepIndex(Math.min(existing.current_step ?? 0, 6));
       setData(recoveredData);
       setOther((existing.other as Record<string, string>) || {});
       setHydrated(true);
     };
 
-    loadBriefing();
+    void loadBriefing();
   }, [profile]);
 
   const persistForm = useCallback((formData: FormState) => {
-    const serviceScores = buildServiceScoresFromData(formData as Record<string, unknown>);
-    const inferredService = getServiceTypeFromData({
-      ...formData,
-      service_scores: serviceScores,
-    } as Record<string, unknown>);
-
+    const inferredService = getServiceTypeFromData(formData as Record<string, unknown>);
     return {
       ...formData,
+      form_version: NEW_FORM_VERSION,
       service_type: inferredService,
     } as FormState;
   }, []);
@@ -157,7 +164,7 @@ function BriefingPage() {
 
     if (debounceRef.current) clearTimeout(debounceRef.current);
     debounceRef.current = setTimeout(() => {
-      saveToSupabase(stepIndex, data, other);
+      void saveToSupabase(stepIndex, data, other);
     }, DEBOUNCE_MS);
 
     return () => {
@@ -165,26 +172,29 @@ function BriefingPage() {
     };
   }, [stepIndex, data, other, hydrated, submitted, alreadyCompleted, saveToSupabase]);
 
-  const serviceType = useMemo(() => getServiceTypeFromData(data as Record<string, unknown>), [data]);
   const workflow = useMemo(() => buildDiagnosticWorkflow(data as Record<string, unknown>), [data]);
   const totalSteps = workflow.length;
   const current = workflow[stepIndex] ?? workflow[workflow.length - 1];
-  const progress = submitted ? 100 : Math.round((stepIndex / Math.max(1, totalSteps)) * 100);
+  const progress = submitted ? 100 : Math.round(((stepIndex + 1) / Math.max(1, totalSteps)) * 100);
+  const serviceType = useMemo(
+    () => getServiceTypeFromData(data as Record<string, unknown>),
+    [data],
+  );
 
   const update = useCallback(
-    (id: string, v: Value) => {
-      setData((prev) => persistForm({ ...prev, [id]: v }));
+    (id: string, value: Value) => {
+      setData((prev) => persistForm({ ...prev, [id]: value }));
     },
     [persistForm],
   );
 
   const isStepValid = useMemo(() => {
     if (!current) return true;
-    return current.fields.every((f) => {
-      if (!f.required) return true;
-      const v = data[f.id];
-      if (Array.isArray(v)) return v.length > 0;
-      return typeof v === "string" && v.trim().length > 0;
+    return current.fields.every((field) => {
+      if (!field.required) return true;
+      const value = data[field.id];
+      if (Array.isArray(value)) return value.length > 0;
+      return typeof value === "string" && value.trim().length > 0;
     });
   }, [current, data]);
 
@@ -192,7 +202,7 @@ function BriefingPage() {
     if (!isStepValid) return;
 
     if (stepIndex < totalSteps - 1) {
-      setStepIndex((i) => i + 1);
+      setStepIndex((index) => index + 1);
       window.scrollTo({ top: 0, behavior: "smooth" });
       return;
     }
@@ -241,25 +251,25 @@ function BriefingPage() {
 
   const prev = () => {
     if (stepIndex > 0) {
-      setStepIndex((i) => i - 1);
+      setStepIndex((index) => index - 1);
       window.scrollTo({ top: 0, behavior: "smooth" });
     }
   };
 
   const reset = () => {
     if (!confirm("Tem certeza que deseja apagar todas as respostas?")) return;
-    setData({});
+    setData({ form_version: NEW_FORM_VERSION });
     setOther({});
     setStepIndex(0);
     setSubmitted(false);
     if (briefingId) {
-      supabase.from("briefings").delete().eq("id", briefingId);
+      void supabase.from("briefings").delete().eq("id", briefingId);
       setBriefingId(null);
     }
   };
 
   const startNew = () => {
-    setData({});
+    setData({ form_version: NEW_FORM_VERSION });
     setOther({});
     setStepIndex(0);
     setSubmitted(false);
@@ -275,7 +285,7 @@ function BriefingPage() {
       .insert({
         profile_id: profile.id,
         current_step: 0,
-        data: {},
+        data: { form_version: NEW_FORM_VERSION },
         other: {},
       })
       .select()
@@ -287,6 +297,7 @@ function BriefingPage() {
     }
 
     if (newBriefing) {
+      setBriefingId(newBriefing.id);
       startNew();
       navigate({ to: "/briefing" });
     }
@@ -307,7 +318,7 @@ function BriefingPage() {
           <img
             src={logoSrc}
             alt="VNEXUS TEC"
-            className="mx-auto w-72 h-auto object-contain drop-shadow-[0_0_30px_rgba(15,76,255,0.35)]"
+            className="mx-auto h-auto w-72 object-contain drop-shadow-[0_0_30px_rgba(15,76,255,0.35)]"
             draggable={false}
           />
           <div className="mt-8 inline-flex items-center gap-2 rounded-full border border-accent/40 bg-accent/10 px-4 py-1.5 text-xs font-semibold uppercase tracking-widest text-accent">
@@ -317,9 +328,8 @@ function BriefingPage() {
             Você já concluiu este <span className="text-gradient-gold">briefing</span>.
           </h1>
           <p className="mx-auto mt-5 max-w-lg text-sm text-muted-foreground sm:text-base">
-            Nosso time já recebeu suas respostas. Se precisar de algo, estamos à disposição.
+            Nosso time já recebeu suas respostas e está trabalhando no próximo passo.
           </p>
-
           <div className="mt-10 flex flex-wrap items-center justify-center gap-3">
             <button
               onClick={handleNewBriefing}
@@ -350,17 +360,19 @@ function BriefingPage() {
           <img
             src={logoSrc}
             alt="VNEXUS TEC"
-            className="w-72 h-auto object-contain drop-shadow-[0_0_30px_rgba(15,76,255,0.35)]"
+            className="h-auto w-72 object-contain drop-shadow-[0_0_30px_rgba(15,76,255,0.35)]"
             draggable={false}
           />
           <p className="mt-4 text-xs font-semibold uppercase tracking-[0.3em] text-gradient-gold">
-            Diagnóstico inteligente · {SERVICE_OPTIONS.find((service) => service.id === serviceType)?.label || "Caminho ideal"}
+            Diagnóstico inicial ·{" "}
+            {SERVICE_OPTIONS.find((option) => option.id === serviceType)?.label || "Melhor solução"}
           </p>
           <h1 className="mt-3 text-3xl font-bold leading-tight sm:text-4xl">
-            Vamos entender o que você precisa <span className="text-gradient-gold">agora</span>
+            Vamos entender seu <span className="text-gradient-gold">projeto</span>
           </h1>
           <p className="mt-3 max-w-xl text-sm text-muted-foreground sm:text-base">
-            O sistema identifica o melhor caminho para o seu caso. Suas respostas são salvas automaticamente.
+            As respostas vão guiar a melhor solução e manter o processo simples, claro e rápido no
+            celular.
           </p>
         </header>
 
@@ -374,34 +386,12 @@ function BriefingPage() {
               <span className="text-gradient-gold">{progress}%</span>
             </span>
           </div>
+
           <div className="relative h-2 w-full overflow-hidden rounded-full bg-muted">
             <div
-              className="absolute inset-y-0 left-0 bg-gradient-brand transition-[width] duration-500 ease-out"
+              className="absolute inset-y-0 left-0 bg-gradient-brand transition-all duration-500 ease-out"
               style={{ width: `${progress}%` }}
             />
-            <div
-              className="absolute inset-y-0 left-0 bg-gradient-gold opacity-60 blur-sm transition-[width] duration-500 ease-out"
-              style={{ width: `${progress}%` }}
-            />
-          </div>
-          <div className="mt-3 hidden flex-wrap gap-1.5 sm:flex">
-            {workflow.map((s, i) => (
-              <button
-                key={s.id}
-                onClick={() => i < stepIndex && setStepIndex(i)}
-                disabled={i > stepIndex}
-                className={`flex-1 truncate rounded-md px-2 py-1.5 text-[10px] font-medium uppercase tracking-wider transition-all ${
-                  i === stepIndex
-                    ? "bg-primary/20 text-foreground ring-1 ring-primary"
-                    : i < stepIndex
-                      ? "bg-accent/10 text-accent hover:bg-accent/20"
-                      : "bg-muted/40 text-muted-foreground"
-                }`}
-                title={s.title}
-              >
-                {i + 1}. {s.title}
-              </button>
-            ))}
           </div>
         </div>
 
@@ -418,12 +408,33 @@ function BriefingPage() {
                 key={field.id}
                 field={field}
                 value={data[field.id]}
-                other={other[field.id] || ""}
-                onChange={(v) => update(field.id, v)}
-                onOtherChange={(v) => setOther((o) => ({ ...o, [field.id]: v }))}
-                profileId={profile?.id || ""}
+                onChange={(value) => update(field.id, value)}
+                onOtherChange={(value) => update(field.id, value)}
               />
             ))}
+
+            {current.id === "resultado-revelado" && (
+              <div className="rounded-2xl border border-primary/20 bg-primary/5 p-5">
+                <p className="text-xs font-semibold uppercase tracking-[0.22em] text-primary">
+                  Solução recomendada
+                </p>
+                <div className="mt-3 flex items-center gap-3">
+                  <span className="text-3xl" aria-hidden="true">
+                    {SERVICE_OPTIONS.find((option) => option.id === serviceType)?.icon ?? "✨"}
+                  </span>
+                  <div>
+                    <h3 className="text-xl font-bold text-foreground">
+                      {SERVICE_OPTIONS.find((option) => option.id === serviceType)?.label ??
+                        "Solução personalizada"}
+                    </h3>
+                    <p className="text-sm text-muted-foreground">
+                      {SERVICE_OPTIONS.find((option) => option.id === serviceType)?.description ??
+                        "A solução ideal para seu caso."}
+                    </p>
+                  </div>
+                </div>
+              </div>
+            )}
           </div>
 
           <div className="mt-10 flex flex-col-reverse gap-3 sm:flex-row sm:items-center sm:justify-between">
@@ -442,9 +453,8 @@ function BriefingPage() {
               className="group relative overflow-hidden rounded-lg bg-gradient-brand px-7 py-3 text-sm font-bold uppercase tracking-wider text-primary-foreground shadow-glow transition hover:scale-[1.02] disabled:cursor-not-allowed disabled:opacity-40 disabled:hover:scale-100"
             >
               <span className="relative z-10">
-                {stepIndex === totalSteps - 1 ? "Finalizar diagnóstico →" : "Avançar →"}
+                {stepIndex === totalSteps - 1 ? "Finalizar →" : "Avançar →"}
               </span>
-              <span className="absolute inset-0 -translate-x-full bg-gradient-gold opacity-0 transition group-hover:translate-x-0 group-hover:opacity-30" />
             </button>
           </div>
         </div>
@@ -470,7 +480,7 @@ function ThankYou({ onNew }: { onNew: () => void }) {
         <img
           src={logoSrc}
           alt="VNEXUS TEC"
-          className="mx-auto w-72 h-auto object-contain drop-shadow-[0_0_30px_rgba(15,76,255,0.35)]"
+          className="mx-auto h-auto w-72 object-contain drop-shadow-[0_0_30px_rgba(15,76,255,0.35)]"
           draggable={false}
         />
         <div className="mt-8 inline-flex items-center gap-2 rounded-full border border-accent/40 bg-accent/10 px-4 py-1.5 text-xs font-semibold uppercase tracking-widest text-accent">
@@ -498,10 +508,6 @@ function ThankYou({ onNew }: { onNew: () => void }) {
             Voltar ao início
           </Link>
         </div>
-
-        <p className="mt-16 text-xs text-muted-foreground">
-          © {new Date().getFullYear()} VNEXUS TEC · Engenharia digital de alta conversão
-        </p>
       </div>
     </div>
   );
@@ -510,280 +516,96 @@ function ThankYou({ onNew }: { onNew: () => void }) {
 function FieldInput({
   field,
   value,
-  other,
   onChange,
   onOtherChange,
-  profileId,
 }: {
   field: Field;
   value: Value | undefined;
-  other: string;
   onChange: (v: Value) => void;
   onOtherChange: (v: string) => void;
-  profileId: string;
 }) {
-  const [uploading, setUploading] = useState(false);
-  const [uploadError, setUploadError] = useState("");
-  const labelEl = (
-    <label className="mb-2 flex items-baseline justify-between gap-3">
-      <span className="text-sm font-semibold text-foreground">
+  const inputCls =
+    "w-full rounded-xl border border-border bg-input/40 px-4 py-3 text-sm text-foreground placeholder:text-muted-foreground/60 transition focus:border-primary focus:bg-input/70 focus:outline-none focus:ring-2 focus:ring-primary/30";
+
+  if (field.type === "radio") {
+    return (
+      <div>
+        <label className="mb-2 block text-sm font-semibold text-foreground">
+          {field.label}
+          {field.required && <span className="ml-1 text-accent">*</span>}
+        </label>
+        <div className="grid gap-3 sm:grid-cols-2">
+          {field.options?.map((option) => {
+            const selected = value === option;
+            return (
+              <button
+                key={option}
+                type="button"
+                onClick={() => onChange(option)}
+                className={`min-h-14 rounded-xl border px-4 py-3 text-left text-sm font-medium transition ${
+                  selected
+                    ? "border-primary bg-primary/12 text-foreground shadow-glow"
+                    : "border-border bg-input/25 text-muted-foreground hover:border-primary hover:text-foreground"
+                }`}
+              >
+                {option}
+              </button>
+            );
+          })}
+        </div>
+        {field.allowOther && (
+          <input
+            type="text"
+            value={typeof value === "string" ? value : ""}
+            onChange={(event) => {
+              const nextValue = event.target.value;
+              onOtherChange(nextValue);
+              if (nextValue.trim()) onChange(nextValue);
+            }}
+            className={`${inputCls} mt-3`}
+            placeholder="Outro"
+          />
+        )}
+      </div>
+    );
+  }
+
+  if (
+    field.type === "text" ||
+    field.type === "email" ||
+    field.type === "tel" ||
+    field.type === "url"
+  ) {
+    return (
+      <div>
+        <label className="mb-2 block text-sm font-semibold text-foreground">
+          {field.label}
+          {field.required && <span className="ml-1 text-accent">*</span>}
+        </label>
+        <input
+          type={field.type}
+          value={typeof value === "string" ? value : ""}
+          onChange={(event) => onChange(event.target.value)}
+          placeholder={field.placeholder}
+          className={inputCls}
+        />
+      </div>
+    );
+  }
+
+  return (
+    <div>
+      <label className="mb-2 block text-sm font-semibold text-foreground">
         {field.label}
         {field.required && <span className="ml-1 text-accent">*</span>}
-      </span>
-    </label>
+      </label>
+      <textarea
+        value={typeof value === "string" ? value : ""}
+        onChange={(event) => onChange(event.target.value)}
+        placeholder={field.placeholder}
+        rows={4}
+        className={`${inputCls} resize-y`}
+      />
+    </div>
   );
-  const hintEl = field.hint && <p className="mt-1.5 text-xs text-muted-foreground">{field.hint}</p>;
-  const inputCls =
-    "w-full rounded-lg border border-border bg-input/40 px-4 py-3 text-sm text-foreground placeholder:text-muted-foreground/60 transition focus:border-primary focus:bg-input/70 focus:outline-none focus:ring-2 focus:ring-primary/30";
-
-  switch (field.type) {
-    case "text":
-    case "email":
-    case "tel":
-    case "url":
-      return (
-        <div>
-          {labelEl}
-          <input
-            type={field.type}
-            value={(value as string) || ""}
-            placeholder={field.placeholder}
-            onChange={(e) => onChange(e.target.value)}
-            className={inputCls}
-          />
-          {hintEl}
-        </div>
-      );
-    case "textarea":
-      return (
-        <div>
-          {labelEl}
-          <textarea
-            rows={4}
-            value={(value as string) || ""}
-            placeholder={field.placeholder}
-            onChange={(e) => onChange(e.target.value)}
-            className={inputCls + " resize-y leading-relaxed"}
-          />
-          {hintEl}
-        </div>
-      );
-    case "radio":
-      return (
-        <div>
-          {labelEl}
-          <div className="grid gap-2 sm:grid-cols-2">
-            {field.options?.map((opt) => {
-              const selected = value === opt;
-              return (
-                <button
-                  key={opt}
-                  type="button"
-                  onClick={() => onChange(opt)}
-                  className={`group flex items-center gap-3 rounded-lg border px-4 py-3 text-left text-sm transition ${
-                    selected
-                      ? "border-accent bg-accent/10 text-foreground shadow-gold"
-                      : "border-border bg-input/30 text-muted-foreground hover:border-primary hover:text-foreground"
-                  }`}
-                >
-                  <span
-                    className={`flex h-4 w-4 shrink-0 items-center justify-center rounded-full border ${
-                      selected ? "border-accent bg-accent" : "border-muted-foreground/50"
-                    }`}
-                  >
-                    {selected && <span className="h-1.5 w-1.5 rounded-full bg-graphite" />}
-                  </span>
-                  <span className="font-medium">{opt}</span>
-                </button>
-              );
-            })}
-            {field.allowOther && (
-              <input
-                type="text"
-                value={other}
-                onChange={(e) => {
-                  onOtherChange(e.target.value);
-                  if (e.target.value) onChange(`Outro: ${e.target.value}`);
-                }}
-                placeholder="Outro (especifique)…"
-                className={inputCls + " sm:col-span-2"}
-              />
-            )}
-          </div>
-          {hintEl}
-        </div>
-      );
-    case "checkbox": {
-      const arr = Array.isArray(value) ? (value as string[]) : [];
-      return (
-        <div>
-          {labelEl}
-          <div className="grid gap-2 sm:grid-cols-2">
-            {field.options?.map((opt) => {
-              const checked = arr.includes(opt);
-              return (
-                <button
-                  key={opt}
-                  type="button"
-                  onClick={() => onChange(checked ? arr.filter((o) => o !== opt) : [...arr, opt])}
-                  className={`flex items-center gap-3 rounded-lg border px-4 py-3 text-left text-sm transition ${
-                    checked
-                      ? "border-primary bg-primary/15 text-foreground"
-                      : "border-border bg-input/30 text-muted-foreground hover:border-primary hover:text-foreground"
-                  }`}
-                >
-                  <span
-                    className={`flex h-4 w-4 shrink-0 items-center justify-center rounded border ${
-                      checked
-                        ? "border-primary bg-primary text-primary-foreground"
-                        : "border-muted-foreground/50"
-                    }`}
-                  >
-                    {checked && (
-                      <svg
-                        viewBox="0 0 12 12"
-                        className="h-3 w-3"
-                        fill="none"
-                        stroke="currentColor"
-                        strokeWidth="2.5"
-                      >
-                        <path d="M2 6l3 3 5-6" strokeLinecap="round" strokeLinejoin="round" />
-                      </svg>
-                    )}
-                  </span>
-                  <span className="font-medium">{opt}</span>
-                </button>
-              );
-            })}
-          </div>
-          {hintEl}
-        </div>
-      );
-    }
-    case "file": {
-      const urls = Array.isArray(value) ? (value as string[]) : [];
-
-      const isImageUrl = (url: string) => /\.(jpg|jpeg|png|webp|gif)(\?.*)?$/i.test(url);
-
-      const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
-        const files = Array.from(e.target.files || []);
-        if (files.length === 0 || !profileId) return;
-
-        setUploadError("");
-        setUploading(true);
-        try {
-          const uploadedUrls: string[] = [];
-          for (const file of files) {
-            try {
-              const filePath = `${profileId}/${field.id}/${Date.now()}-${file.name}`;
-              const { error: supaError } = await supabase.storage
-                .from("briefing_files")
-                .upload(filePath, file);
-              if (supaError) {
-                console.error("[BRIEFING] upload error:", file.name, supaError.message);
-                setUploadError(`Erro ao enviar "${file.name}": ${supaError.message}`);
-                continue;
-              }
-              const {
-                data: { publicUrl },
-              } = supabase.storage.from("briefing_files").getPublicUrl(filePath);
-              uploadedUrls.push(publicUrl);
-            } catch (err) {
-              console.error("[BRIEFING] upload error for file:", file.name, err);
-              setUploadError(`Erro ao enviar "${file.name}". Tente novamente.`);
-            }
-          }
-          if (uploadedUrls.length > 0) {
-            onChange([...urls, ...uploadedUrls]);
-          }
-        } finally {
-          setUploading(false);
-        }
-        e.target.value = "";
-      };
-
-      return (
-        <div>
-          {labelEl}
-
-          {urls.length === 0 && !uploading && (
-            <label className="flex cursor-pointer flex-col items-center justify-center gap-2 rounded-lg border-2 border-dashed border-border bg-input/20 px-6 py-8 text-center transition hover:border-primary hover:bg-input/40">
-              <svg
-                className="h-8 w-8 text-muted-foreground"
-                viewBox="0 0 24 24"
-                fill="none"
-                stroke="currentColor"
-                strokeWidth="1.5"
-              >
-                <path
-                  d="M12 16V4m0 0l-4 4m4-4l4 4M4 20h16"
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                />
-              </svg>
-              <span className="text-sm font-medium text-foreground">
-                Clique para enviar arquivos
-              </span>
-              <span className="text-xs text-muted-foreground">ou arraste e solte aqui</span>
-              <input
-                type="file"
-                multiple
-                className="hidden"
-                disabled={uploading}
-                onChange={handleFileUpload}
-              />
-            </label>
-          )}
-
-          {uploading && (
-            <div className="flex flex-col items-center justify-center gap-3 rounded-lg border-2 border-dashed border-border bg-input/20 px-6 py-8 text-center">
-              <span className="h-6 w-6 animate-spin rounded-full border-2 border-primary border-t-transparent" />
-              <span className="text-sm text-muted-foreground">Enviando arquivos...</span>
-            </div>
-          )}
-
-          {urls.length > 0 && (
-            <div className="space-y-2">
-              {urls.map((url, i) => (
-                <div
-                  key={i}
-                  className="flex items-center gap-3 rounded-lg border border-border/40 bg-muted/20 p-3"
-                >
-                  {isImageUrl(url) ? (
-                    <img src={url} alt="" className="h-12 w-12 shrink-0 rounded object-cover" />
-                  ) : (
-                    <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded bg-muted/40 text-xs text-muted-foreground">
-                      {url.split(".").pop()?.toUpperCase() || "FILE"}
-                    </div>
-                  )}
-                  <span className="flex-1 truncate text-sm font-medium text-foreground">
-                    {url.split("/").pop()}
-                  </span>
-                  <button
-                    type="button"
-                    onClick={() => onChange(urls.filter((_, idx) => idx !== i))}
-                    className="shrink-0 text-xs text-muted-foreground hover:text-destructive"
-                  >
-                    Remover
-                  </button>
-                </div>
-              ))}
-              {!uploading && (
-                <label className="flex cursor-pointer items-center justify-center gap-2 rounded-lg border border-dashed border-border py-3 text-xs text-muted-foreground transition hover:border-primary hover:text-foreground">
-                  + Adicionar mais arquivos
-                  <input type="file" multiple className="hidden" onChange={handleFileUpload} />
-                </label>
-              )}
-            </div>
-          )}
-
-          {uploadError && (
-            <p className="mt-2 text-xs font-medium text-destructive">{uploadError}</p>
-          )}
-
-          {hintEl}
-        </div>
-      );
-    }
-  }
 }

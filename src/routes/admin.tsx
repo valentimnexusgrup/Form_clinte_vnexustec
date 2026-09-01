@@ -49,7 +49,14 @@ const STATUS_OPTIONS = [
   "Arquivado",
 ];
 
-const ADMIN_USERS = [{ full_name: "Admin VNEXUS", phone_last4: "{0203}" }];
+// Credenciais de admin lidas de variáveis de ambiente
+const ADMIN_USERNAME = import.meta.env.VITE_ADMIN_USERNAME || "";
+const ADMIN_PASSWORD = import.meta.env.VITE_ADMIN_PASSWORD || "";
+
+const ADMIN_USERS =
+  ADMIN_USERNAME && ADMIN_PASSWORD
+    ? [{ full_name: ADMIN_USERNAME, phone_last4: ADMIN_PASSWORD }]
+    : [];
 
 function AdminPage() {
   const {
@@ -72,6 +79,9 @@ function AdminPage() {
   const [adminPhone, setAdminPhone] = useState("");
   const [adminError, setAdminError] = useState("");
   const [adminSubmitting, setAdminSubmitting] = useState(false);
+
+  // Validação de segurança: credenciais de admin devem estar configuradas
+  const hasAdminCredentials = ADMIN_USERS.length > 0;
 
   const isAdmin = profile
     ? ADMIN_USERS.some(
@@ -179,59 +189,76 @@ function AdminPage() {
             draggable={false}
           />
           <h1 className="mt-6 text-2xl font-bold">Área Administrativa</h1>
-          <p className="mt-2 text-sm text-muted-foreground">
-            Identifique-se para acessar o painel.
-          </p>
 
-          <form onSubmit={handleAdminLogin} className="mt-8 w-full space-y-4">
-            <div className="text-left">
-              <label
-                htmlFor="admin-name"
-                className="mb-1.5 block text-xs font-semibold uppercase tracking-wider text-muted-foreground"
-              >
-                Nome
-              </label>
-              <input
-                id="admin-name"
-                name="admin-name"
-                type="text"
-                value={adminName}
-                onChange={(e) => setAdminName(e.target.value)}
-                placeholder="Digite seu nome"
-                className="w-full rounded-lg border border-border bg-input/40 px-4 py-3 text-sm text-foreground placeholder:text-muted-foreground/60 transition focus:border-primary focus:bg-input/70 focus:outline-none focus:ring-2 focus:ring-primary/30"
-                disabled={adminSubmitting}
-              />
+          {!hasAdminCredentials && (
+            <div className="mt-4 rounded-lg border border-destructive/50 bg-destructive/10 p-3">
+              <p className="text-sm font-semibold text-destructive">⚠️ Erro de Configuração</p>
+              <p className="mt-1 text-xs text-muted-foreground">
+                Credenciais de admin não configuradas. Configure as variáveis{" "}
+                <code className="text-xs">VITE_ADMIN_USERNAME</code> e{" "}
+                <code className="text-xs">VITE_ADMIN_PASSWORD</code> no arquivo{" "}
+                <code className="text-xs">.env</code>.
+              </p>
             </div>
-            <div className="text-left">
-              <label
-                htmlFor="admin-identifier"
-                className="mb-1.5 block text-xs font-semibold uppercase tracking-wider text-muted-foreground"
-              >
-                Identificador
-              </label>
-              <input
-                id="admin-identifier"
-                name="admin-identifier"
-                type="text"
-                value={adminPhone}
-                onChange={(e) => setAdminPhone(e.target.value)}
-                placeholder="Digite seu identificador"
-                className="w-full rounded-lg border border-border bg-input/40 px-4 py-3 text-sm text-foreground placeholder:text-muted-foreground/60 transition focus:border-primary focus:bg-input/70 focus:outline-none focus:ring-2 focus:ring-primary/30"
-                disabled={adminSubmitting}
-              />
-            </div>
-            {adminError && <p className="text-xs font-medium text-destructive">{adminError}</p>}
-            <button
-              type="submit"
-              disabled={adminSubmitting}
-              className="group relative w-full overflow-hidden rounded-lg bg-gradient-brand px-6 py-3 text-sm font-bold uppercase tracking-wider text-primary-foreground shadow-glow transition hover:scale-[1.02] disabled:cursor-not-allowed disabled:opacity-60"
-            >
-              <span className="relative z-10">
-                {adminSubmitting ? "Aguarde..." : "Acessar painel"}
-              </span>
-              <span className="absolute inset-0 -translate-x-full bg-gradient-gold opacity-0 transition group-hover:translate-x-0 group-hover:opacity-30" />
-            </button>
-          </form>
+          )}
+
+          {hasAdminCredentials && (
+            <>
+              <p className="mt-2 text-sm text-muted-foreground">
+                Identifique-se para acessar o painel.
+              </p>
+
+              <form onSubmit={handleAdminLogin} className="mt-8 w-full space-y-4">
+                <div className="text-left">
+                  <label
+                    htmlFor="admin-name"
+                    className="mb-1.5 block text-xs font-semibold uppercase tracking-wider text-muted-foreground"
+                  >
+                    Usuário
+                  </label>
+                  <input
+                    id="admin-name"
+                    name="admin-name"
+                    type="text"
+                    value={adminName}
+                    onChange={(e) => setAdminName(e.target.value)}
+                    placeholder="Digite seu usuário"
+                    className="w-full rounded-lg border border-border bg-input/40 px-4 py-3 text-sm text-foreground placeholder:text-muted-foreground/60 transition focus:border-primary focus:bg-input/70 focus:outline-none focus:ring-2 focus:ring-primary/30"
+                    disabled={adminSubmitting}
+                  />
+                </div>
+                <div className="text-left">
+                  <label
+                    htmlFor="admin-identifier"
+                    className="mb-1.5 block text-xs font-semibold uppercase tracking-wider text-muted-foreground"
+                  >
+                    Senha
+                  </label>
+                  <input
+                    id="admin-identifier"
+                    name="admin-identifier"
+                    type="password"
+                    value={adminPhone}
+                    onChange={(e) => setAdminPhone(e.target.value)}
+                    placeholder="Digite sua senha"
+                    className="w-full rounded-lg border border-border bg-input/40 px-4 py-3 text-sm text-foreground placeholder:text-muted-foreground/60 transition focus:border-primary focus:bg-input/70 focus:outline-none focus:ring-2 focus:ring-primary/30"
+                    disabled={adminSubmitting}
+                  />
+                </div>
+                {adminError && <p className="text-xs font-medium text-destructive">{adminError}</p>}
+                <button
+                  type="submit"
+                  disabled={adminSubmitting}
+                  className="group relative w-full overflow-hidden rounded-lg bg-gradient-brand px-6 py-3 text-sm font-bold uppercase tracking-wider text-primary-foreground shadow-glow transition hover:scale-[1.02] disabled:cursor-not-allowed disabled:opacity-60"
+                >
+                  <span className="relative z-10">
+                    {adminSubmitting ? "Aguarde..." : "Acessar painel"}
+                  </span>
+                  <span className="absolute inset-0 -translate-x-full bg-gradient-gold opacity-0 transition group-hover:translate-x-0 group-hover:opacity-30" />
+                </button>
+              </form>
+            </>
+          )}
 
           <div className="mt-8 flex items-center justify-center gap-4">
             <Link
@@ -345,7 +372,9 @@ function AdminPage() {
                   </thead>
                   <tbody className="divide-y divide-border/40">
                     {filtered.map((b) => {
-                      const serviceType = getServiceTypeFromData((b.data as Record<string, unknown>) ?? {});
+                      const serviceType = getServiceTypeFromData(
+                        (b.data as Record<string, unknown>) ?? {},
+                      );
                       const serviceLabel =
                         SERVICE_OPTIONS.find((option) => option.id === serviceType)?.label ||
                         "Serviço identificado";
@@ -573,7 +602,8 @@ function BriefingDetail({
       <div className="mb-4 rounded-lg border border-border/40 bg-muted/20 p-3">
         <p className="text-xs font-semibold text-muted-foreground">Tipo de serviço</p>
         <p className="text-sm font-medium">
-          {SERVICE_OPTIONS.find((option) => option.id === serviceType)?.label || "Serviço identificado"}
+          {SERVICE_OPTIONS.find((option) => option.id === serviceType)?.label ||
+            "Serviço identificado"}
         </p>
       </div>
 
