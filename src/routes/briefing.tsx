@@ -2,9 +2,9 @@ import { useEffect, useMemo, useState, useCallback, useRef } from "react";
 import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
 import logoSrc from "@/assets/vnexus-logo.webp";
 import {
-  DEFAULT_SERVICE_TYPE,
   SERVICE_OPTIONS,
-  getServiceFlow,
+  buildDiagnosticWorkflow,
+  buildServiceScoresFromData,
   getServiceTypeFromData,
   type Field,
   type ServiceType,
@@ -36,8 +36,6 @@ function BriefingPage() {
   const navigate = useNavigate();
 
   const [hydrated, setHydrated] = useState(false);
-  const [selectedService, setSelectedService] = useState<ServiceType>(DEFAULT_SERVICE_TYPE);
-  const [showServicePicker, setShowServicePicker] = useState(true);
   const [stepIndex, setStepIndex] = useState(0);
   const [data, setData] = useState<FormState>({});
   const [other, setOther] = useState<Record<string, string>>({});
@@ -58,8 +56,6 @@ function BriefingPage() {
     if (!profile) return;
 
     const loadBriefing = async () => {
-      console.log("[BRIEFING] carregando para profile:", profile.id);
-
       const { data: list, error } = await supabase
         .from("briefings")
         .select("*")
@@ -74,31 +70,23 @@ function BriefingPage() {
       }
 
       if (!list || list.length === 0) {
-        console.log("[BRIEFING] nenhum briefing encontrado");
         setHydrated(true);
         return;
       }
 
       const existing = list[0];
       const recoveredData = (existing.data as FormState) || {};
-      const recoveredService = getServiceTypeFromData(recoveredData);
 
       if (existing.completed) {
-        console.log("[BRIEFING] briefing já concluído:", existing.id);
         setAlreadyCompleted(true);
         setBriefingId(existing.id);
-        setSelectedService(recoveredService);
-        setShowServicePicker(false);
         setData(recoveredData);
         setOther((existing.other as Record<string, string>) || {});
         setHydrated(true);
         return;
       }
 
-      console.log("[BRIEFING] briefing incompleto restaurado:", existing.id);
       setBriefingId(existing.id);
-      setSelectedService(recoveredService);
-      setShowServicePicker(false);
       setStepIndex(existing.current_step);
       setData(recoveredData);
       setOther((existing.other as Record<string, string>) || {});
@@ -108,13 +96,27 @@ function BriefingPage() {
     loadBriefing();
   }, [profile]);
 
+  const persistForm = useCallback((formData: FormState) => {
+    const serviceScores = buildServiceScoresFromData(formData as Record<string, unknown>);
+    const inferredService = getServiceTypeFromData({
+      ...formData,
+      service_scores: serviceScores,
+    } as Record<string, unknown>);
+
+    return {
+      ...formData,
+      service_type: inferredService,
+    } as FormState;
+  }, []);
+
   const saveToSupabase = useCallback(
     async (step: number, formData: FormState, formOther: Record<string, string>) => {
       if (!profile || submitted) return;
       setSaving(true);
 
       try {
-        const persistedData = { ...formData, service_type: selectedService };
+        const persistedData = persistForm(formData);
+
         if (briefingId) {
           await supabase
             .from("briefings")
@@ -147,7 +149,7 @@ function BriefingPage() {
         setSaving(false);
       }
     },
-    [profile, briefingId, submitted, selectedService],
+    [briefingId, persistForm, profile, submitted],
   );
 
   useEffect(() => {
@@ -163,16 +165,21 @@ function BriefingPage() {
     };
   }, [stepIndex, data, other, hydrated, submitted, alreadyCompleted, saveToSupabase]);
 
-  const steps = getServiceFlow(selectedService);
-  const totalSteps = steps.length;
-  const current = steps[stepIndex];
-  const progress = submitted ? 100 : Math.round((stepIndex / totalSteps) * 100);
+  const serviceType = useMemo(() => getServiceTypeFromData(data as Record<string, unknown>), [data]);
+  const workflow = useMemo(() => buildDiagnosticWorkflow(data as Record<string, unknown>), [data]);
+  const totalSteps = workflow.length;
+  const current = workflow[stepIndex] ?? workflow[workflow.length - 1];
+  const progress = submitted ? 100 : Math.round((stepIndex / Math.max(1, totalSteps)) * 100);
 
-  const update = useCallback((id: string, v: Value) => {
-    setData((d) => ({ ...d, [id]: v }));
-  }, []);
+  const update = useCallback(
+    (id: string, v: Value) => {
+      setData((prev) => persistForm({ ...prev, [id]: v }));
+    },
+    [persistForm],
+  );
 
   const isStepValid = useMemo(() => {
+    if (!current) return true;
     return current.fields.every((f) => {
       if (!f.required) return true;
       const v = data[f.id];
@@ -183,49 +190,53 @@ function BriefingPage() {
 
   const next = async () => {
     if (!isStepValid) return;
+
     if (stepIndex < totalSteps - 1) {
       setStepIndex((i) => i + 1);
       window.scrollTo({ top: 0, behavior: "smooth" });
-    } else {
-      if (profile) {
-        try {
-          const persistedData = { ...data, service_type: selectedService };
-          if (briefingId) {
-            await supabase
-              .from("briefings")
-              .update({
-                current_step: stepIndex,
-                data: persistedData,
-                other,
-                completed: true,
-                status: "Novo",
-                updated_at: new Date().toISOString(),
-              })
-              .eq("id", briefingId);
-          } else {
-            const { data: newBriefing } = await supabase
-              .from("briefings")
-              .insert({
-                profile_id: profile.id,
-                current_step: stepIndex,
-                data: persistedData,
-                other,
-                completed: true,
-                status: "Novo",
-              })
-              .select()
-              .single();
-            if (newBriefing) {
-              setBriefingId(newBriefing.id);
-            }
-          }
-        } catch (err) {
-          console.error("[BRIEFING] submission error:", err);
-        }
-      }
-      setSubmitted(true);
-      window.scrollTo({ top: 0, behavior: "smooth" });
+      return;
     }
+
+    if (profile) {
+      try {
+        const persistedData = persistForm(data);
+        if (briefingId) {
+          await supabase
+            .from("briefings")
+            .update({
+              current_step: stepIndex,
+              data: persistedData,
+              other,
+              completed: true,
+              status: "Novo",
+              updated_at: new Date().toISOString(),
+            })
+            .eq("id", briefingId);
+        } else {
+          const { data: newBriefing } = await supabase
+            .from("briefings")
+            .insert({
+              profile_id: profile.id,
+              current_step: stepIndex,
+              data: persistedData,
+              other,
+              completed: true,
+              status: "Novo",
+            })
+            .select()
+            .single();
+
+          if (newBriefing) {
+            setBriefingId(newBriefing.id);
+          }
+        }
+      } catch (err) {
+        console.error("[BRIEFING] submission error:", err);
+      }
+    }
+
+    setSubmitted(true);
+    window.scrollTo({ top: 0, behavior: "smooth" });
   };
 
   const prev = () => {
@@ -237,11 +248,10 @@ function BriefingPage() {
 
   const reset = () => {
     if (!confirm("Tem certeza que deseja apagar todas as respostas?")) return;
-    setData({ service_type: selectedService });
+    setData({});
     setOther({});
     setStepIndex(0);
     setSubmitted(false);
-    setShowServicePicker(false);
     if (briefingId) {
       supabase.from("briefings").delete().eq("id", briefingId);
       setBriefingId(null);
@@ -249,25 +259,23 @@ function BriefingPage() {
   };
 
   const startNew = () => {
-    setData({ service_type: DEFAULT_SERVICE_TYPE });
+    setData({});
     setOther({});
     setStepIndex(0);
     setSubmitted(false);
     setBriefingId(null);
     setAlreadyCompleted(false);
-    setSelectedService(DEFAULT_SERVICE_TYPE);
-    setShowServicePicker(true);
   };
 
   const handleNewBriefing = async () => {
     if (!profile) return;
-    console.log("[BRIEFING] criando novo briefing para profile:", profile.id);
+
     const { data: newBriefing, error } = await supabase
       .from("briefings")
       .insert({
         profile_id: profile.id,
         current_step: 0,
-        data: { service_type: selectedService },
+        data: {},
         other: {},
       })
       .select()
@@ -279,7 +287,6 @@ function BriefingPage() {
     }
 
     if (newBriefing) {
-      console.log("[BRIEFING] novo briefing criado:", newBriefing.id);
       startNew();
       navigate({ to: "/briefing" });
     }
@@ -336,88 +343,6 @@ function BriefingPage() {
     return <ThankYou onNew={startNew} />;
   }
 
-  if (showServicePicker) {
-    return (
-      <div className="min-h-screen px-4 py-10 sm:py-16">
-        <div className="mx-auto max-w-6xl">
-          <header className="mb-10 text-center">
-            <img
-              src={logoSrc}
-              alt="VNEXUS TEC"
-              className="mx-auto w-72 h-auto object-contain drop-shadow-[0_0_30px_rgba(15,76,255,0.35)]"
-              draggable={false}
-            />
-            <p className="mt-4 text-xs font-semibold uppercase tracking-[0.3em] text-gradient-gold">
-              Formulário Cliente
-            </p>
-            <h1 className="mt-3 text-3xl font-bold leading-tight sm:text-4xl">
-              Escolha o serviço que você precisa
-            </h1>
-            <p className="mt-3 max-w-2xl text-sm text-muted-foreground sm:text-base mx-auto">
-              Seu fluxo será montado com as perguntas certas para esse projeto, sem perder o que já foi salvo.
-            </p>
-          </header>
-
-          <div className="grid gap-5 md:grid-cols-2 xl:grid-cols-4">
-            {SERVICE_OPTIONS.map((service) => {
-              const selected = selectedService === service.id;
-              return (
-                <button
-                  key={service.id}
-                  type="button"
-                  onClick={() => {
-                    setSelectedService(service.id);
-                    setData((prev) => ({ ...prev, service_type: service.id }));
-                    setStepIndex(0);
-                    setSubmitted(false);
-                  }}
-                  className={`group relative overflow-hidden rounded-2xl border p-5 text-left transition duration-200 ${
-                    selected
-                      ? "border-primary bg-primary/10 shadow-glow"
-                      : "border-border/60 bg-gradient-surface hover:border-primary/70 hover:shadow-gold"
-                  }`}
-                >
-                  <div className="mb-5 flex h-12 w-12 items-center justify-center rounded-xl bg-gradient-brand text-2xl shadow-glow">
-                    {service.icon}
-                  </div>
-                  <div className="mb-3 flex items-center justify-between gap-3">
-                    <h2 className="text-xl font-bold text-foreground">{service.label}</h2>
-                    {selected && (
-                      <span className="rounded-full border border-primary/50 bg-primary/10 px-2 py-1 text-[10px] font-bold uppercase tracking-wider text-primary">
-                        Selecionado
-                      </span>
-                    )}
-                  </div>
-                  <p className="text-sm leading-relaxed text-muted-foreground">
-                    {service.description}
-                  </p>
-                  <div className="mt-6 inline-flex items-center gap-2 text-sm font-semibold text-gradient-gold">
-                    Começar agora <span aria-hidden="true">→</span>
-                  </div>
-                </button>
-              );
-            })}
-          </div>
-
-          <div className="mt-10 flex justify-center">
-            <button
-              type="button"
-              onClick={() => {
-                setShowServicePicker(false);
-                setData((prev) => ({ ...prev, service_type: selectedService }));
-                setStepIndex(0);
-              }}
-              disabled={!selectedService}
-              className="group relative overflow-hidden rounded-lg bg-gradient-brand px-7 py-3 text-sm font-bold uppercase tracking-wider text-primary-foreground shadow-glow transition hover:scale-[1.02] disabled:cursor-not-allowed disabled:opacity-40"
-            >
-              <span className="relative z-10">Continuar para o formulário →</span>
-            </button>
-          </div>
-        </div>
-      </div>
-    );
-  }
-
   return (
     <div className="min-h-screen px-4 py-10 sm:py-16">
       <div className="mx-auto max-w-3xl">
@@ -429,14 +354,13 @@ function BriefingPage() {
             draggable={false}
           />
           <p className="mt-4 text-xs font-semibold uppercase tracking-[0.3em] text-gradient-gold">
-            Formulário Cliente · {SERVICE_OPTIONS.find((service) => service.id === selectedService)?.label || "Landing Page"}
+            Diagnóstico inteligente · {SERVICE_OPTIONS.find((service) => service.id === serviceType)?.label || "Caminho ideal"}
           </p>
           <h1 className="mt-3 text-3xl font-bold leading-tight sm:text-4xl">
-            Vamos desenhar o seu próximo <span className="text-gradient-gold">{SERVICE_OPTIONS.find((service) => service.id === selectedService)?.shortLabel || "projeto"}</span>
+            Vamos entender o que você precisa <span className="text-gradient-gold">agora</span>
           </h1>
           <p className="mt-3 max-w-xl text-sm text-muted-foreground sm:text-base">
-            Leva menos de 8 minutos. Suas respostas são salvas automaticamente — você pode parar e
-            voltar quando quiser.
+            O sistema identifica o melhor caminho para o seu caso. Suas respostas são salvas automaticamente.
           </p>
         </header>
 
@@ -461,7 +385,7 @@ function BriefingPage() {
             />
           </div>
           <div className="mt-3 hidden flex-wrap gap-1.5 sm:flex">
-            {steps.map((s, i) => (
+            {workflow.map((s, i) => (
               <button
                 key={s.id}
                 onClick={() => i < stepIndex && setStepIndex(i)}
@@ -518,7 +442,7 @@ function BriefingPage() {
               className="group relative overflow-hidden rounded-lg bg-gradient-brand px-7 py-3 text-sm font-bold uppercase tracking-wider text-primary-foreground shadow-glow transition hover:scale-[1.02] disabled:cursor-not-allowed disabled:opacity-40 disabled:hover:scale-100"
             >
               <span className="relative z-10">
-                {stepIndex === totalSteps - 1 ? "Enviar briefing →" : "Avançar →"}
+                {stepIndex === totalSteps - 1 ? "Finalizar diagnóstico →" : "Avançar →"}
               </span>
               <span className="absolute inset-0 -translate-x-full bg-gradient-gold opacity-0 transition group-hover:translate-x-0 group-hover:opacity-30" />
             </button>

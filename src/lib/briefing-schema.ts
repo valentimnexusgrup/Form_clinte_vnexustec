@@ -508,16 +508,199 @@ export const closingSteps: Step[] = [
   },
 ];
 
+const diagnosticFields: Field[] = [
+  {
+    id: "objetivo_principal",
+    label: "Qual é o objetivo principal dessa solução?",
+    type: "radio",
+    options: [
+      "Gerar leads/contatos",
+      "Vender um produto/serviço",
+      "Agendar consultas/reuniões",
+      "Captar inscrições para evento",
+      "Apresentar a marca",
+      "Organizar processos internos",
+    ],
+    required: true,
+    allowOther: true,
+  },
+  {
+    id: "presenca_digital_atual",
+    label: "Como está hoje a sua presença digital?",
+    type: "radio",
+    options: [
+      "Não tenho nada estruturado ainda",
+      "Tenho uma rede fraca ou incompleta",
+      "Tenho alguma presença, mas pouco organizada",
+      "Já tenho algo funcionando, mas preciso evoluir",
+    ],
+    required: true,
+  },
+  {
+    id: "acao_esperada",
+    label: "O que você espera que a pessoa faça após ver isso?",
+    type: "text",
+    placeholder: "Ex.: comprar, entrar em contato, agendar, assinar, se cadastrar",
+    required: true,
+  },
+  {
+    id: "processos_internos",
+    label: "Essa solução precisa resolver mais uma questão de venda ou de processo interno?",
+    type: "radio",
+    options: ["Venda/cliente", "Processo interno/operacional", "Os dois igualmente"],
+    required: true,
+  },
+  {
+    id: "principal_dor",
+    label: "Qual é a dor principal de hoje?",
+    type: "textarea",
+    placeholder: "Descreva o problema mais urgente em poucas linhas.",
+    required: true,
+  },
+];
+
+const diagnosticStep: Step = {
+  id: "diagnostico-objetivo_principal",
+  title: "Diagnóstico inicial",
+  subtitle: "Responda isso para identificarmos o caminho mais adequado para seu caso.",
+  fields: diagnosticFields,
+};
+
+const serviceTypeSet = new Set<ServiceType>([
+  "central-de-links",
+  "landing-page",
+  "site-institucional",
+  "sistema",
+]);
+
+function normalizeServiceType(value: unknown): ServiceType | null {
+  if (typeof value !== "string") return null;
+  return serviceTypeSet.has(value as ServiceType) ? (value as ServiceType) : null;
+}
+
+export function buildServiceScoresFromData(data?: Record<string, unknown>): Record<ServiceType, number> {
+  const scores: Record<ServiceType, number> = {
+    "central-de-links": 0,
+    "landing-page": 0,
+    "site-institucional": 0,
+    sistema: 0,
+  };
+
+  const findText = (...values: unknown[]) =>
+    values
+      .map((value) => (typeof value === "string" ? value.toLowerCase() : Array.isArray(value) ? value.join(" ").toLowerCase() : ""))
+      .join(" ");
+
+  const combined = findText(
+    data?.objetivo_principal,
+    data?.presenca_digital_atual,
+    data?.acao_esperada,
+    data?.processos_internos,
+    data?.principal_dor,
+    data?.descricao,
+  );
+
+  const score = (key: ServiceType, matchers: RegExp[]) => {
+    const count = matchers.reduce((total, regex) => total + (regex.test(combined) ? 1 : 0), 0);
+    scores[key] += count * 2;
+  };
+
+  score("landing-page", [
+    /vender|produto|serviço|oferta|lead|contato|agendar|inscrição|captar|clicar|whatsapp|consulta/i,
+    /oferta clara|converter|venda|captação|cliente/i,
+  ]);
+
+  score("central-de-links", [
+    /instagram|link|rede social|contato|redes|perfil|bio|linktree|whatsapp|multi.*link/i,
+    /centralizar|agendar|contatos|encontrar|seguir|acessar/i,
+  ]);
+
+  score("site-institucional", [
+    /marca|empresa|credibilidade|institucional|apresentar|nicho|sobre|história|sólido|posicionamento/i,
+    /site|presença|negócio|arquitetura|conteúdo|brand/i,
+  ]);
+
+  score("sistema", [
+    /automação|processo|cadastro|dashboard|relatório|gestão|interno|ferramenta|estoque|vendas|fluxo/i,
+    /controle|permissão|usuarios|operacional|erp|crm|sistema/i,
+  ]);
+
+  if (combined.includes("processo") || combined.includes("operacional") || combined.includes("gestão")) {
+    scores.sistema += 3;
+  }
+  if (combined.includes("marca") || combined.includes("empresa") || combined.includes("credibilidade")) {
+    scores["site-institucional"] += 3;
+  }
+  if (combined.includes("instagram") || combined.includes("social") || combined.includes("bio")) {
+    scores["central-de-links"] += 2;
+  }
+  if (combined.includes("venda") || combined.includes("lead") || combined.includes("oferta")) {
+    scores["landing-page"] += 3;
+  }
+
+  return scores;
+}
+
+export function shouldAskTieBreaker(data?: { service_scores?: Record<string, number> }): boolean {
+  const scores = data?.service_scores ?? {};
+  const entries = Object.entries(scores)
+    .filter(([, value]) => typeof value === "number")
+    .sort(([, left], [, right]) => right - left);
+
+  if (entries.length < 2) return false;
+  const [topName, topValue] = entries[0];
+  const [, secondValue] = entries[1];
+
+  if (topValue <= 0) return false;
+  const diff = topValue - secondValue;
+  const isClose = diff <= 1 && topName !== "sistema" && secondValue > 0;
+  return isClose;
+}
+
+export function inferServiceTypeFromData(data?: Record<string, unknown>): ServiceType {
+  const serviceTypeFromData = normalizeServiceType(data?.service_type);
+  if (serviceTypeFromData) {
+    return serviceTypeFromData;
+  }
+
+  const serviceScores = data?.service_scores
+    ? (data.service_scores as Record<string, number>)
+    : buildServiceScoresFromData(data);
+
+  const ranked = (Object.entries(serviceScores) as [ServiceType, number][]).sort(
+    ([, left], [, right]) => right - left,
+  );
+
+  if (ranked.length === 0) return DEFAULT_SERVICE_TYPE;
+  const [bestService, bestScore] = ranked[0];
+  const [, secondScore] = ranked[1] ?? [bestService, 0];
+
+  if (bestScore > 0 && bestScore - secondScore <= 1 && shouldAskTieBreaker({ service_scores: serviceScores })) {
+    return bestService;
+  }
+
+  return bestService;
+}
+
+export function buildDiagnosticWorkflow(data?: Record<string, unknown>): Step[] {
+  const inferredService = inferServiceTypeFromData(data);
+  return [diagnosticStep, ...getServiceFlow(inferredService)];
+}
+
 export function getServiceFlow(serviceType: ServiceType = DEFAULT_SERVICE_TYPE): Step[] {
   return [...commonSteps, ...serviceSteps[serviceType], ...closingSteps];
 }
 
 export function getServiceTypeFromData(data?: Record<string, unknown>): ServiceType {
-  const value = data?.service_type;
-  if (value === "central-de-links" || value === "landing-page" || value === "site-institucional" || value === "sistema") {
-    return value;
+  const explicit = normalizeServiceType(data?.service_type);
+  if (explicit) return explicit;
+
+  const fromScores = data?.service_scores;
+  if (fromScores && typeof fromScores === "object") {
+    return inferServiceTypeFromData({ ...data, service_scores: fromScores as Record<string, number> });
   }
-  return DEFAULT_SERVICE_TYPE;
+
+  return inferServiceTypeFromData(data);
 }
 
 export const steps: Step[] = getServiceFlow(DEFAULT_SERVICE_TYPE);

@@ -2,11 +2,12 @@ import { describe, it } from "node:test";
 import assert from "node:assert/strict";
 
 import {
-  getServiceFlow,
+  buildDiagnosticWorkflow,
+  buildServiceScoresFromData,
   getServiceTypeFromData,
   SERVICE_OPTIONS,
-  type ServiceType,
-} from "./briefing-schema";
+  shouldAskTieBreaker,
+} from "./briefing-schema.ts";
 
 describe("briefing schema", () => {
   it("exposes the four service flows", () => {
@@ -15,17 +16,38 @@ describe("briefing schema", () => {
       ["central-de-links", "landing-page", "site-institucional", "sistema"],
     );
 
-    const flow = getServiceFlow("central-de-links");
-    assert.equal(flow[0]?.title, "Sobre você");
-    assert.equal(flow[1]?.title, "Sobre o negócio");
-    assert.ok(flow.some((step) => step.id === "links-incluir"));
+    const flow = buildDiagnosticWorkflow({
+      objetivo_principal: "Vender um produto ou captar contato por uma oferta específica",
+    });
+
+    assert.equal(flow[0]?.fields[0]?.id, "objetivo_principal");
+    assert.ok(flow.some((step) => step.id === "diagnostico-objetivo_principal"));
   });
 
-  it("detects service type from persisted data", () => {
-    const serviceType = getServiceTypeFromData({ service_type: "site-institucional" as ServiceType });
-    assert.equal(serviceType, "site-institucional");
+  it("infers service type and scores from diagnosis answers", () => {
+    const data = {
+      objetivo_principal: "Vender um produto ou captar contato por uma oferta específica",
+      presenca_digital_atual: "Não tenho nada estruturado ainda",
+      acao_esperada: "Que ela veja uma oferta clara e feche a ação na hora",
+      processos_internos: "Não é o foco do momento",
+      principal_dor: "Preciso vender uma oferta ou captar clientes de forma direta",
+    };
 
-    const fallback = getServiceTypeFromData({});
-    assert.equal(fallback, "landing-page");
+    const scores = buildServiceScoresFromData(data);
+    const inferred = getServiceTypeFromData({ ...data, service_scores: scores });
+
+    assert.ok(scores["landing-page"] > scores["site-institucional"]);
+    assert.equal(inferred, "landing-page");
+  });
+
+  it("asks a tie-breaker only when the top scores are close", () => {
+    const tiedScores = {
+      "central-de-links": 3,
+      "landing-page": 3,
+      "site-institucional": 2,
+      sistema: 1,
+    };
+
+    assert.equal(shouldAskTieBreaker({ service_scores: tiedScores }), true);
   });
 });
