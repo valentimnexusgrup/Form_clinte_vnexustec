@@ -1,7 +1,14 @@
 import { useEffect, useMemo, useState, useCallback, useRef } from "react";
 import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
 import logoSrc from "@/assets/vnexus-logo.webp";
-import { steps, type Field } from "@/lib/briefing-schema";
+import {
+  DEFAULT_SERVICE_TYPE,
+  SERVICE_OPTIONS,
+  getServiceFlow,
+  getServiceTypeFromData,
+  type Field,
+  type ServiceType,
+} from "@/lib/briefing-schema";
 import { useIdentification } from "@/lib/identification";
 import { supabase } from "@/lib/supabase";
 
@@ -29,6 +36,8 @@ function BriefingPage() {
   const navigate = useNavigate();
 
   const [hydrated, setHydrated] = useState(false);
+  const [selectedService, setSelectedService] = useState<ServiceType>(DEFAULT_SERVICE_TYPE);
+  const [showServicePicker, setShowServicePicker] = useState(true);
   const [stepIndex, setStepIndex] = useState(0);
   const [data, setData] = useState<FormState>({});
   const [other, setOther] = useState<Record<string, string>>({});
@@ -71,12 +80,16 @@ function BriefingPage() {
       }
 
       const existing = list[0];
+      const recoveredData = (existing.data as FormState) || {};
+      const recoveredService = getServiceTypeFromData(recoveredData);
 
       if (existing.completed) {
         console.log("[BRIEFING] briefing já concluído:", existing.id);
         setAlreadyCompleted(true);
         setBriefingId(existing.id);
-        setData((existing.data as FormState) || {});
+        setSelectedService(recoveredService);
+        setShowServicePicker(false);
+        setData(recoveredData);
         setOther((existing.other as Record<string, string>) || {});
         setHydrated(true);
         return;
@@ -84,8 +97,10 @@ function BriefingPage() {
 
       console.log("[BRIEFING] briefing incompleto restaurado:", existing.id);
       setBriefingId(existing.id);
+      setSelectedService(recoveredService);
+      setShowServicePicker(false);
       setStepIndex(existing.current_step);
-      setData((existing.data as FormState) || {});
+      setData(recoveredData);
       setOther((existing.other as Record<string, string>) || {});
       setHydrated(true);
     };
@@ -99,12 +114,13 @@ function BriefingPage() {
       setSaving(true);
 
       try {
+        const persistedData = { ...formData, service_type: selectedService };
         if (briefingId) {
           await supabase
             .from("briefings")
             .update({
               current_step: step,
-              data: formData,
+              data: persistedData,
               other: formOther,
               updated_at: new Date().toISOString(),
             })
@@ -115,7 +131,7 @@ function BriefingPage() {
             .insert({
               profile_id: profile.id,
               current_step: step,
-              data: formData,
+              data: persistedData,
               other: formOther,
             })
             .select()
@@ -131,7 +147,7 @@ function BriefingPage() {
         setSaving(false);
       }
     },
-    [profile, briefingId, submitted],
+    [profile, briefingId, submitted, selectedService],
   );
 
   useEffect(() => {
@@ -147,6 +163,7 @@ function BriefingPage() {
     };
   }, [stepIndex, data, other, hydrated, submitted, alreadyCompleted, saveToSupabase]);
 
+  const steps = getServiceFlow(selectedService);
   const totalSteps = steps.length;
   const current = steps[stepIndex];
   const progress = submitted ? 100 : Math.round((stepIndex / totalSteps) * 100);
@@ -172,12 +189,13 @@ function BriefingPage() {
     } else {
       if (profile) {
         try {
+          const persistedData = { ...data, service_type: selectedService };
           if (briefingId) {
             await supabase
               .from("briefings")
               .update({
                 current_step: stepIndex,
-                data,
+                data: persistedData,
                 other,
                 completed: true,
                 status: "Novo",
@@ -190,7 +208,7 @@ function BriefingPage() {
               .insert({
                 profile_id: profile.id,
                 current_step: stepIndex,
-                data,
+                data: persistedData,
                 other,
                 completed: true,
                 status: "Novo",
@@ -219,10 +237,11 @@ function BriefingPage() {
 
   const reset = () => {
     if (!confirm("Tem certeza que deseja apagar todas as respostas?")) return;
-    setData({});
+    setData({ service_type: selectedService });
     setOther({});
     setStepIndex(0);
     setSubmitted(false);
+    setShowServicePicker(false);
     if (briefingId) {
       supabase.from("briefings").delete().eq("id", briefingId);
       setBriefingId(null);
@@ -230,12 +249,14 @@ function BriefingPage() {
   };
 
   const startNew = () => {
-    setData({});
+    setData({ service_type: DEFAULT_SERVICE_TYPE });
     setOther({});
     setStepIndex(0);
     setSubmitted(false);
     setBriefingId(null);
     setAlreadyCompleted(false);
+    setSelectedService(DEFAULT_SERVICE_TYPE);
+    setShowServicePicker(true);
   };
 
   const handleNewBriefing = async () => {
@@ -246,7 +267,7 @@ function BriefingPage() {
       .insert({
         profile_id: profile.id,
         current_step: 0,
-        data: {},
+        data: { service_type: selectedService },
         other: {},
       })
       .select()
@@ -315,6 +336,88 @@ function BriefingPage() {
     return <ThankYou onNew={startNew} />;
   }
 
+  if (showServicePicker) {
+    return (
+      <div className="min-h-screen px-4 py-10 sm:py-16">
+        <div className="mx-auto max-w-6xl">
+          <header className="mb-10 text-center">
+            <img
+              src={logoSrc}
+              alt="VNEXUS TEC"
+              className="mx-auto w-72 h-auto object-contain drop-shadow-[0_0_30px_rgba(15,76,255,0.35)]"
+              draggable={false}
+            />
+            <p className="mt-4 text-xs font-semibold uppercase tracking-[0.3em] text-gradient-gold">
+              Formulário Cliente
+            </p>
+            <h1 className="mt-3 text-3xl font-bold leading-tight sm:text-4xl">
+              Escolha o serviço que você precisa
+            </h1>
+            <p className="mt-3 max-w-2xl text-sm text-muted-foreground sm:text-base mx-auto">
+              Seu fluxo será montado com as perguntas certas para esse projeto, sem perder o que já foi salvo.
+            </p>
+          </header>
+
+          <div className="grid gap-5 md:grid-cols-2 xl:grid-cols-4">
+            {SERVICE_OPTIONS.map((service) => {
+              const selected = selectedService === service.id;
+              return (
+                <button
+                  key={service.id}
+                  type="button"
+                  onClick={() => {
+                    setSelectedService(service.id);
+                    setData((prev) => ({ ...prev, service_type: service.id }));
+                    setStepIndex(0);
+                    setSubmitted(false);
+                  }}
+                  className={`group relative overflow-hidden rounded-2xl border p-5 text-left transition duration-200 ${
+                    selected
+                      ? "border-primary bg-primary/10 shadow-glow"
+                      : "border-border/60 bg-gradient-surface hover:border-primary/70 hover:shadow-gold"
+                  }`}
+                >
+                  <div className="mb-5 flex h-12 w-12 items-center justify-center rounded-xl bg-gradient-brand text-2xl shadow-glow">
+                    {service.icon}
+                  </div>
+                  <div className="mb-3 flex items-center justify-between gap-3">
+                    <h2 className="text-xl font-bold text-foreground">{service.label}</h2>
+                    {selected && (
+                      <span className="rounded-full border border-primary/50 bg-primary/10 px-2 py-1 text-[10px] font-bold uppercase tracking-wider text-primary">
+                        Selecionado
+                      </span>
+                    )}
+                  </div>
+                  <p className="text-sm leading-relaxed text-muted-foreground">
+                    {service.description}
+                  </p>
+                  <div className="mt-6 inline-flex items-center gap-2 text-sm font-semibold text-gradient-gold">
+                    Começar agora <span aria-hidden="true">→</span>
+                  </div>
+                </button>
+              );
+            })}
+          </div>
+
+          <div className="mt-10 flex justify-center">
+            <button
+              type="button"
+              onClick={() => {
+                setShowServicePicker(false);
+                setData((prev) => ({ ...prev, service_type: selectedService }));
+                setStepIndex(0);
+              }}
+              disabled={!selectedService}
+              className="group relative overflow-hidden rounded-lg bg-gradient-brand px-7 py-3 text-sm font-bold uppercase tracking-wider text-primary-foreground shadow-glow transition hover:scale-[1.02] disabled:cursor-not-allowed disabled:opacity-40"
+            >
+              <span className="relative z-10">Continuar para o formulário →</span>
+            </button>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div className="min-h-screen px-4 py-10 sm:py-16">
       <div className="mx-auto max-w-3xl">
@@ -326,11 +429,10 @@ function BriefingPage() {
             draggable={false}
           />
           <p className="mt-4 text-xs font-semibold uppercase tracking-[0.3em] text-gradient-gold">
-            Briefing · Landing Page
+            Formulário Cliente · {SERVICE_OPTIONS.find((service) => service.id === selectedService)?.label || "Landing Page"}
           </p>
           <h1 className="mt-3 text-3xl font-bold leading-tight sm:text-4xl">
-            Vamos desenhar a sua próxima{" "}
-            <span className="text-gradient-gold">página de alta conversão</span>
+            Vamos desenhar o seu próximo <span className="text-gradient-gold">{SERVICE_OPTIONS.find((service) => service.id === selectedService)?.shortLabel || "projeto"}</span>
           </h1>
           <p className="mt-3 max-w-xl text-sm text-muted-foreground sm:text-base">
             Leva menos de 8 minutos. Suas respostas são salvas automaticamente — você pode parar e

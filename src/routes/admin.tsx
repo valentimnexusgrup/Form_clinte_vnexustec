@@ -3,7 +3,12 @@ import logoSrc from "@/assets/vnexus-logo.webp";
 import { useIdentification } from "@/lib/identification";
 import { useEffect, useState, useCallback } from "react";
 import { supabase } from "@/lib/supabase";
-import { steps } from "@/lib/briefing-schema";
+import {
+  getServiceFlow,
+  getServiceTypeFromData,
+  SERVICE_OPTIONS,
+  type ServiceType,
+} from "@/lib/briefing-schema";
 import { buildBriefing, type FormState } from "@/lib/briefing-summary";
 import { Download } from "lucide-react";
 
@@ -58,6 +63,7 @@ function AdminPage() {
 
   const [briefings, setBriefings] = useState<BriefingRow[]>([]);
   const [loading, setLoading] = useState(true);
+  const [serviceFilter, setServiceFilter] = useState<string>("");
   const [search, setSearch] = useState("");
   const [statusFilter, setStatusFilter] = useState("");
   const [selectedId, setSelectedId] = useState<string | null>(null);
@@ -97,7 +103,10 @@ function AdminPage() {
     const searchLower = search.toLowerCase();
     const nameMatch = b.profiles?.full_name?.toLowerCase().includes(searchLower);
     const statusMatch = !statusFilter || b.status === statusFilter;
-    return (nameMatch || !search) && statusMatch;
+    const data = b.data as Record<string, unknown> | undefined;
+    const serviceType = getServiceTypeFromData(data ?? {});
+    const serviceMatch = !serviceFilter || serviceType === serviceFilter;
+    return (nameMatch || !search) && statusMatch && serviceMatch;
   });
 
   const updateStatus = async (id: string, status: string) => {
@@ -300,6 +309,18 @@ function AdminPage() {
                   </option>
                 ))}
               </select>
+              <select
+                value={serviceFilter}
+                onChange={(e) => setServiceFilter(e.target.value)}
+                className="w-full rounded-lg border border-border bg-input/40 px-4 py-2.5 text-sm text-foreground transition focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/30 sm:w-48"
+              >
+                <option value="">Todos os serviços</option>
+                {SERVICE_OPTIONS.map((service) => (
+                  <option key={service.id} value={service.id}>
+                    {service.label}
+                  </option>
+                ))}
+              </select>
             </div>
 
             {loading ? (
@@ -323,60 +344,72 @@ function AdminPage() {
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-border/40">
-                    {filtered.map((b) => (
-                      <tr
-                        key={b.id}
-                        onClick={() => setSelectedId(b.id)}
-                        className={`cursor-pointer transition hover:bg-muted/20 ${
-                          selectedId === b.id ? "bg-accent/5" : ""
-                        }`}
-                      >
-                        <td className="px-4 py-3">
-                          <div className="flex items-center gap-2.5">
-                            <div className="flex h-8 w-8 shrink-0 items-center justify-center overflow-hidden rounded-full bg-gradient-brand text-[10px] font-bold uppercase text-primary-foreground">
-                              {b.profiles?.full_name?.charAt(0).toUpperCase() ||
-                                b.profile_id?.charAt(0).toUpperCase() ||
-                                "?"}
-                            </div>
-                            <div className="min-w-0">
-                              <p className="truncate font-medium text-foreground">
-                                {b.profiles?.full_name || "—"}
-                              </p>
-                              {b.profile_id && (
-                                <p className="truncate text-[10px] text-muted-foreground">
-                                  {b.profile_id}
+                    {filtered.map((b) => {
+                      const serviceType = getServiceTypeFromData((b.data as Record<string, unknown>) ?? {});
+                      const serviceLabel =
+                        SERVICE_OPTIONS.find((option) => option.id === serviceType)?.label ||
+                        "Landing Page";
+
+                      return (
+                        <tr
+                          key={b.id}
+                          onClick={() => setSelectedId(b.id)}
+                          className={`cursor-pointer transition hover:bg-muted/20 ${
+                            selectedId === b.id ? "bg-accent/5" : ""
+                          }`}
+                        >
+                          <td className="px-4 py-3">
+                            <div className="flex items-center gap-2.5">
+                              <div className="flex h-8 w-8 shrink-0 items-center justify-center overflow-hidden rounded-full bg-gradient-brand text-[10px] font-bold uppercase text-primary-foreground">
+                                {b.profiles?.full_name?.charAt(0).toUpperCase() ||
+                                  b.profile_id?.charAt(0).toUpperCase() ||
+                                  "?"}
+                              </div>
+                              <div className="min-w-0">
+                                <p className="truncate font-medium text-foreground">
+                                  {b.profiles?.full_name || "—"}
                                 </p>
-                              )}
+                                {b.profile_id && (
+                                  <p className="truncate text-[10px] text-muted-foreground">
+                                    {b.profile_id}
+                                  </p>
+                                )}
+                              </div>
                             </div>
-                          </div>
-                        </td>
-                        <td className="px-4 py-3">
-                          <StatusBadge status={b.status || "Novo"} />
-                        </td>
-                        <td className="px-4 py-3">
-                          <span className="text-xs text-muted-foreground">
-                            {b.completed
-                              ? "Completo"
-                              : `Etapa ${b.current_step + 1}/${steps.length}`}
-                          </span>
-                        </td>
-                        <td className="hidden px-4 py-3 text-xs text-muted-foreground sm:table-cell">
-                          {new Date(b.created_at).toLocaleDateString("pt-BR")}
-                        </td>
-                        <td className="px-4 py-3 text-right">
-                          <button
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              deleteBriefing(b.id);
-                            }}
-                            className="text-xs text-muted-foreground underline-offset-2 hover:text-destructive hover:underline"
-                            title="Excluir"
-                          >
-                            Excluir
-                          </button>
-                        </td>
-                      </tr>
-                    ))}
+                          </td>
+                          <td className="px-4 py-3">
+                            <div className="flex flex-col gap-1.5">
+                              <StatusBadge status={b.status || "Novo"} />
+                              <span className="text-[10px] uppercase tracking-wider text-muted-foreground">
+                                {serviceLabel}
+                              </span>
+                            </div>
+                          </td>
+                          <td className="px-4 py-3">
+                            <span className="text-xs text-muted-foreground">
+                              {b.completed
+                                ? "Completo"
+                                : `Etapa ${b.current_step + 1}/${getServiceFlow(serviceType).length}`}
+                            </span>
+                          </td>
+                          <td className="hidden px-4 py-3 text-xs text-muted-foreground sm:table-cell">
+                            {new Date(b.created_at).toLocaleDateString("pt-BR")}
+                          </td>
+                          <td className="px-4 py-3 text-right">
+                            <button
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                deleteBriefing(b.id);
+                              }}
+                              className="text-xs text-muted-foreground underline-offset-2 hover:text-destructive hover:underline"
+                              title="Excluir"
+                            >
+                              Excluir
+                            </button>
+                          </td>
+                        </tr>
+                      );
+                    })}
                   </tbody>
                 </table>
               </div>
@@ -434,10 +467,12 @@ function BriefingDetail({
   onBack: () => void;
 }) {
   const data = briefing.data as Record<string, string | string[]>;
+  const serviceType = getServiceTypeFromData(data as Record<string, unknown>);
+  const flow = getServiceFlow(serviceType);
   const [copied, setCopied] = useState(false);
 
   const fileFieldIds = new Set(
-    steps.flatMap((s) => s.fields.filter((f) => f.type === "file").map((f) => f.id)),
+    flow.flatMap((s) => s.fields.filter((f) => f.type === "file").map((f) => f.id)),
   );
 
   const handleCopyIA = useCallback(async () => {
@@ -536,6 +571,13 @@ function BriefingDetail({
       </div>
 
       <div className="mb-4 rounded-lg border border-border/40 bg-muted/20 p-3">
+        <p className="text-xs font-semibold text-muted-foreground">Tipo de serviço</p>
+        <p className="text-sm font-medium">
+          {SERVICE_OPTIONS.find((option) => option.id === serviceType)?.label || "Landing Page"}
+        </p>
+      </div>
+
+      <div className="mb-4 rounded-lg border border-border/40 bg-muted/20 p-3">
         <p className="text-xs font-semibold text-muted-foreground">ID do Perfil</p>
         <p className="text-sm font-medium">{briefing.profile_id || "—"}</p>
       </div>
@@ -553,7 +595,7 @@ function BriefingDetail({
       </button>
 
       <div className="space-y-4">
-        {steps.map((step) => {
+        {flow.map((step) => {
           const stepData = step.fields
             .map((field) => {
               const val = data[field.id];

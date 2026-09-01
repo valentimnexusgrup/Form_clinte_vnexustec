@@ -1,6 +1,6 @@
 import { useMemo, useState } from "react";
 import logoSrc from "@/assets/vnexus-logo.webp";
-import { steps } from "@/lib/briefing-schema";
+import { getServiceFlow, getServiceTypeFromData } from "@/lib/briefing-schema";
 
 export type Value = string | string[];
 export type FormState = Record<string, Value>;
@@ -75,13 +75,25 @@ export function buildBriefing(
     return String(v);
   };
 
+  const serviceType = getServiceTypeFromData(data as Record<string, unknown>);
+  const steps = getServiceFlow(serviceType);
+  const serviceLabel =
+    serviceType === "central-de-links"
+      ? "Central de Links"
+      : serviceType === "site-institucional"
+        ? "Site institucional"
+        : serviceType === "sistema"
+          ? "Sistema/software"
+          : "Landing Page";
+
   const lines: string[] = [];
-  lines.push("# BRIEFING DE LANDING PAGE — VNEXUS TEC");
+  lines.push(`# BRIEFING DE ${serviceLabel.toUpperCase()} — VNEXUS TEC`);
   lines.push("");
   if (options?.clientName) lines.push(`**Cliente:** ${options.clientName}`);
   if (options?.date)
     lines.push(`**Data de envio:** ${new Date(options.date).toLocaleString("pt-BR")}`);
   if (options?.clientName || options?.date) lines.push("");
+  lines.push(`**Tipo de serviço:** ${serviceLabel}`);
   lines.push("---");
   lines.push("");
   for (const [index, step] of steps.entries()) {
@@ -93,9 +105,15 @@ export function buildBriefing(
   }
   lines.push("---");
   lines.push("## INSTRUÇÕES PARA A IA");
-  lines.push(
-    "Utilize as informações acima para criar uma Landing Page de alta conversão, com copywriting persuasivo, hierarquia visual clara, estrutura otimizada para SEO e CTAs alinhados ao objetivo principal informado. Respeite o estilo visual, paleta de cores, público-alvo e diferenciais do cliente.",
-  );
+  const instructions =
+    serviceType === "sistema"
+      ? "Utilize as informações acima para mapear o fluxo de usuários, permissões, automações, integrações e indicadores que o sistema precisa suportar. Estruture a arquitetura de solução com foco em clareza operacional, segurança e produtividade."
+      : serviceType === "central-de-links"
+        ? "Utilize as informações acima para criar uma central de links funcional, com organização por prioridade, identidade visual clara e telas pensadas para conversão e acessos diretos."
+        : serviceType === "site-institucional"
+          ? "Utilize as informações acima para estruturar um site institucional com navegação clara, páginas estratégicas e narrativa de marca alinhada ao público e objetivos da empresa."
+          : "Utilize as informações acima para criar uma Landing Page de alta conversão, com copywriting persuasivo, hierarquia visual clara, estrutura otimizada para SEO e CTAs alinhados ao objetivo principal informado. Respeite o estilo visual, paleta de cores, público-alvo e diferenciais do cliente.";
+  lines.push(instructions);
   return lines.join("\n");
 }
 
@@ -110,6 +128,8 @@ export function Summary({
   subtitle?: string;
   actions?: React.ReactNode;
 }) {
+  const serviceType = getServiceTypeFromData(data as Record<string, unknown>);
+  const steps = getServiceFlow(serviceType);
   const briefing = useMemo(() => buildBriefing(data), [data]);
   const [copied, setCopied] = useState(false);
 
